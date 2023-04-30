@@ -1,0 +1,1 @@
+# glosslore-authorization
