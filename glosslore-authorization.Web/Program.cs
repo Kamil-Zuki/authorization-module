@@ -17,9 +17,10 @@ builder.Services.AddDbContext<DataContext>(opt =>
 builder.Services.AddCors(c => c.AddPolicy("cors", opt =>
 {
     opt.AllowAnyHeader();
-    opt.AllowCredentials();
+    //opt.AllowCredentials();
     opt.AllowAnyMethod();
-    opt.WithOrigins(builder.Configuration.GetSection("Cors:Urls").Get<string[]>()!);
+    opt.AllowAnyOrigin();
+    //opt.WithOrigins(builder.Configuration.GetSection("Cors:Urls").Get<string[]>()!);
 }));
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddAuthentication(opt => {
