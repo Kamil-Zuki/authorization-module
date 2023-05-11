@@ -52,7 +52,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole<long>>()
 
 builder.Services.AddSwaggerGen(option =>
 {
-    option.SwaggerDoc("v1", new OpenApiInfo { Title = "Glosslore_authorization", Version = "v1" });
+    option.SwaggerDoc("v1", new OpenApiInfo { Title = "Auth API", Version = "v1" });
     option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
@@ -80,8 +80,14 @@ builder.Services.AddSwaggerGen(option =>
 
 var app = builder.Build();
 
-app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwagger(c => {
+    c.RouteTemplate = "auth/swagger/{documentname}/swagger.json";
+});
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/auth/swagger/v1/swagger.json", "Authorization API");
+    c.RoutePrefix = "auth/swagger";
+});
 
 app.UseHttpsRedirection();
 app.UseRouting();

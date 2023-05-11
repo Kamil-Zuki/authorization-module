@@ -12,7 +12,7 @@ using Glosslore_authorization.Web.Services.Identity;
 namespace Glosslore_authorization.Web.Controllers;
 
 [ApiController]
-[Route("accounts")]
+[Route("auth")]
 public class AccountsController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;

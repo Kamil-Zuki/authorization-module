@@ -5,6 +5,7 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <UserSecretsId>5a041859-96fc-40fe-95c7-8a1d471e2044</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>
@@ -25,6 +26,7 @@
       </PackageReference>
       <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="6.27.0" />
       <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="6.27.0" />
+      <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.17.2" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="7.0.3" />
       <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.5.0" />
       <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.5.0" />
