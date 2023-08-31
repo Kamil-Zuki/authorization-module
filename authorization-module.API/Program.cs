@@ -39,6 +39,11 @@ builder.Services.AddAuthentication(opt => {
             ValidAudience = builder.Configuration["Jwt:Audience"]!,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"]!))
         };
+    })
+    .AddVkontakte(options =>
+    {
+        options.ClientId = "YOUR_CLIENT_ID";
+        options.ClientSecret = "YOUR_CLIENT_SECRET";
     });
 builder.Services.AddAuthorization(options => options.DefaultPolicy =
     new AuthorizationPolicyBuilder

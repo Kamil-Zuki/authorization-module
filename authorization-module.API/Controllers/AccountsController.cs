@@ -8,6 +8,9 @@ using authorization_module.API.Data.Entities;
 using authorization_module.API.Extensions;
 using authorization_module.API.Models.Identity;
 using authorization_module.API.Services.Identity;
+using Microsoft.AspNetCore.Authentication;
+using System.Security.Claims;
+using System.Text;
 
 namespace authorization_module.API.Controllers;
 
@@ -150,8 +153,96 @@ public class AccountsController : ControllerBase
             Password = request.Password
         });
     }
+    [HttpGet("external-login")]
+    public IActionResult ExternalLogin(string provider)
+    {
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = "/external-login-callback"
+        };
 
-    [HttpPost]
+        return Challenge(properties, provider);
+    }
+
+    [HttpGet("external-login-callback")]
+    public async Task<IActionResult> ExternalLoginCallback()
+    {
+        var authenticateResult = await HttpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
+
+        if (!authenticateResult.Succeeded)
+        {
+            // Handle external authentication failure
+            return BadRequest("External authentication failed.");
+        }
+
+        var externalId = authenticateResult.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        var email = authenticateResult.Principal.FindFirstValue(ClaimTypes.Email);
+
+        // Retrieve additional user details as needed
+
+        var user = await _userManager.FindByEmailAsync(email);
+
+        if (user != null)
+        {
+            var authRequest = new AuthRequest
+            {
+                Email = email,
+                Password = GenerateRandomPassword()
+            };
+
+            return Ok(await Authenticate(authRequest));
+        }
+        else
+        {
+            var newUser = new ApplicationUser
+            {
+                Email = email,
+                UserName = externalId
+            };
+
+            var result = await _userManager.CreateAsync(newUser);
+
+            if (result.Succeeded)
+            {
+                await _userManager.AddToRoleAsync(newUser, RoleConsts.Member);
+
+                var authRequest = new AuthRequest
+                {
+                    Email = email,
+                    Password = GenerateRandomPassword()
+                };
+
+                return Ok(await Authenticate(authRequest));
+            }
+            else
+            {
+                // Handle new user registration failure
+                return BadRequest("User registration failed.");
+            }
+        }
+    }
+
+    private string GenerateRandomPassword()
+    {
+        const string pool = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()-_=+";
+        const int length = 10;
+
+        var random = new Random();
+        var password = new StringBuilder(length);
+
+        for (var i = 0; i < length; i++)
+        {
+            var characterIndex = random.Next(0, pool.Length);
+            password.Append(pool[characterIndex]);
+        }
+
+        return password.ToString();
+
+    }
+
+
+
+        [HttpPost]
     [Route("refresh-token")]
     public async Task<IActionResult> RefreshToken(TokenModel? tokenModel)
     {
