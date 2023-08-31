@@ -81,12 +81,12 @@ builder.Services.AddSwaggerGen(option =>
 var app = builder.Build();
 
 app.UseSwagger(c => {
-    c.RouteTemplate = "auth/swagger/{documentname}/swagger.json";
+    c.RouteTemplate = "authorization-module/swagger/{documentname}/swagger.json";
 });
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/auth/swagger/v1/swagger.json", "Authorization API");
-    c.RoutePrefix = "auth/swagger";
+    c.SwaggerEndpoint("/authorization-module/swagger/v1/swagger.json", "Authorization API");
+    c.RoutePrefix = "authorization-module/swagger";
 });
 
 app.UseHttpsRedirection();

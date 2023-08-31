@@ -9,7 +9,7 @@ public sealed class DataContext : IdentityDbContext<ApplicationUser, IdentityRol
 {
     public DataContext (DbContextOptions<DataContext> options)
         : base(options)
-    {
+    {   
         Database.Migrate();
     }
 

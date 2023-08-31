@@ -73,38 +73,84 @@ public class AccountsController : ControllerBase
         });
     }
     
+    //[HttpPost("register")]
+    //public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
+    //{
+    //    if (!ModelState.IsValid) return BadRequest(request);
+        
+    //    var user = new ApplicationUser
+    //    {
+    //        Email = request.Email, 
+    //        UserName = request.UserName
+    //    };
+    //    var result = await _userManager.CreateAsync(user, request.Password);
+    //    foreach (var error in result.Errors)
+    //    {
+    //        ModelState.AddModelError(string.Empty, error.Description);
+    //    }
+
+    //    if (!result.Succeeded) 
+    //    {
+            
+    //        return BadRequest(result.Errors); 
+    //    }
+
+    //    var findUser = await _context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
+
+    //    if (findUser == null) throw new Exception($"User {request.Email} not found");
+
+    //    await _userManager.AddToRoleAsync(findUser, RoleConsts.Member);
+            
+    //    return await Authenticate(new AuthRequest
+    //    {
+    //        Email = request.Email,
+    //        Password = request.Password
+    //    });
+    //}
+
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
     {
         if (!ModelState.IsValid) return BadRequest(request);
-        
+
+        var findUser = await _context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
+        if (findUser != null) return BadRequest("User already exists with the given email.");
+
         var user = new ApplicationUser
         {
-            Email = request.Email, 
+            Email = request.Email,
             UserName = request.UserName
         };
-        var result = await _userManager.CreateAsync(user, request.Password);
 
-        foreach (var error in result.Errors)
+        var result = await _userManager.CreateAsync(user, request.Password);
+        if (!result.Succeeded)
         {
-            ModelState.AddModelError(string.Empty, error.Description);
+            // Delete the user if registration fails
+            await _userManager.DeleteAsync(user);
+
+            // Return the errors
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+            return BadRequest(result.Errors);
         }
 
-        if (!result.Succeeded) return BadRequest(result.Errors);
-        
-        var findUser = await _context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
+        await _userManager.AddToRoleAsync(user, RoleConsts.Member);
 
-        if (findUser == null) throw new Exception($"User {request.Email} not found");
+        var authRequest = new AuthRequest
+        {
+            Email = request.Email,
+            Password = request.Password
+        };
 
-        await _userManager.AddToRoleAsync(findUser, RoleConsts.Member);
-            
         return await Authenticate(new AuthRequest
         {
             Email = request.Email,
             Password = request.Password
         });
     }
-    
+
     [HttpPost]
     [Route("refresh-token")]
     public async Task<IActionResult> RefreshToken(TokenModel? tokenModel)
