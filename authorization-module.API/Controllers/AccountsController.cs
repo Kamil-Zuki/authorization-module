@@ -1,16 +1,19 @@
-using System.IdentityModel.Tokens.Jwt;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
 using authorization_module.API.Extensions;
 using authorization_module.API.Models.Identity;
 using authorization_module.API.Services.Identity;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net;
+using System.Net.Mail;
 using System.Security.Claims;
 using System.Text;
+using System.Web;
 
 namespace authorization_module.API.Controllers;
 
@@ -40,33 +43,33 @@ public class AccountsController : ControllerBase
         }
 
         var managedUser = await _userManager.FindByEmailAsync(request.Email);
-        
+
         if (managedUser == null)
         {
             return BadRequest("Bad credentials");
         }
-        
+
         var isPasswordValid = await _userManager.CheckPasswordAsync(managedUser, request.Password);
-        
+
         if (!isPasswordValid)
         {
             return BadRequest("Bad credentials");
         }
-        
+
         var user = _context.Users.FirstOrDefault(u => u.Email == request.Email);
-        
+
         if (user is null)
             return Unauthorized();
 
         var roleIds = await _context.UserRoles.Where(r => r.UserId == user.Id).Select(x => x.RoleId).ToListAsync();
         var roles = _context.Roles.Where(x => roleIds.Contains(x.Id)).ToList();
-        
+
         var accessToken = _tokenService.CreateToken(user, roles);
         user.RefreshToken = _configuration.GenerateRefreshToken();
         user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_configuration.GetSection("Jwt:RefreshTokenValidityInDays").Get<int>());
 
         await _context.SaveChangesAsync();
-        
+
         return Ok(new AuthResponse
         {
             Username = user.UserName!,
@@ -75,84 +78,106 @@ public class AccountsController : ControllerBase
             RefreshToken = user.RefreshToken
         });
     }
-    
-    //[HttpPost("register")]
-    //public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
-    //{
-    //    if (!ModelState.IsValid) return BadRequest(request);
-        
-    //    var user = new ApplicationUser
-    //    {
-    //        Email = request.Email, 
-    //        UserName = request.UserName
-    //    };
-    //    var result = await _userManager.CreateAsync(user, request.Password);
-    //    foreach (var error in result.Errors)
-    //    {
-    //        ModelState.AddModelError(string.Empty, error.Description);
-    //    }
-
-    //    if (!result.Succeeded) 
-    //    {
-            
-    //        return BadRequest(result.Errors); 
-    //    }
-
-    //    var findUser = await _context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
-
-    //    if (findUser == null) throw new Exception($"User {request.Email} not found");
-
-    //    await _userManager.AddToRoleAsync(findUser, RoleConsts.Member);
-            
-    //    return await Authenticate(new AuthRequest
-    //    {
-    //        Email = request.Email,
-    //        Password = request.Password
-    //    });
-    //}
 
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
     {
-        if (!ModelState.IsValid) return BadRequest(request);
-
-        var findUser = await _context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
-        if (findUser != null) return BadRequest("User already exists with the given email.");
-
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(request);
+        }
+        if (await _userManager.FindByEmailAsync(request.Email) != null)
+            return BadRequest("The user with the specified email address already exists");
         var user = new ApplicationUser
         {
             Email = request.Email,
-            UserName = request.UserName
+            UserName = request.Email // Use email as the username
         };
 
         var result = await _userManager.CreateAsync(user, request.Password);
+
         if (!result.Succeeded)
         {
-            // Delete the user if registration fails
-            await _userManager.DeleteAsync(user);
+            var exustingUser = await _userManager.FindByEmailAsync(user.Email);
+            await _userManager.DeleteAsync(exustingUser);
 
-            // Return the errors
             foreach (var error in result.Errors)
             {
                 ModelState.AddModelError(string.Empty, error.Description);
             }
+
             return BadRequest(result.Errors);
         }
 
-        await _userManager.AddToRoleAsync(user, RoleConsts.Member);
+        var tokenn = (await _userManager.GenerateEmailConfirmationTokenAsync(user)).Trim();
+        var encodedToken = HttpUtility.UrlEncode(tokenn);
+        var confirmationLink = $"{Request.Scheme}://{Request.Host}/auth/confirm-email?userId={user.Id}&token={encodedToken}";
 
-        var authRequest = new AuthRequest
-        {
-            Email = request.Email,
-            Password = request.Password
-        };
+        await SendConfirmationEmail(user.Email, confirmationLink);
 
-        return await Authenticate(new AuthRequest
-        {
-            Email = request.Email,
-            Password = request.Password
-        });
+        return Ok("Registration successful. Please check your email for a confirmation link.");
     }
+
+
+    private async Task SendConfirmationEmail(string userEmail, string confirmationLink)
+    {
+        try
+        {
+            using (var client = new SmtpClient())
+            {
+                client.Host = _configuration.GetSection("Email:Host").Get<string>();
+                client.Port = _configuration.GetSection("Email:Port").Get<int>();
+                client.DeliveryMethod = SmtpDeliveryMethod.Network;
+                client.UseDefaultCredentials = false;
+                client.EnableSsl = true;
+                client.Credentials = new NetworkCredential(_configuration.GetSection("Email:UserName").Get<string>(), "hdfqlpwyrsxpwuui");
+                using (var message = new MailMessage(
+                    from: new MailAddress(_configuration.GetSection("Email:Address").Get<string>(), _configuration.GetSection("Email:DisplayName").Get<string>()),
+                    to: new MailAddress($"{userEmail}", "Client")
+                    ))
+                {
+                    message.IsBodyHtml = true;
+                    message.Subject = "Confirm Your Email";
+                    message.Body = $"<html><body><a href='{confirmationLink}'>Click here to confirm your email</a></body></html>";
+
+                    client.Send(message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error sending confirmation email: {ex.Message}");
+        }
+    }
+
+    [HttpGet("confirm-email")]
+    public async Task<ActionResult> ConfirmEmail(string userId, string token)
+    {
+        if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
+        {
+            // Redirect or return an error indicating invalid parameters
+            return BadRequest("Invalid email confirmation parameters");
+        }
+        //token = HttpUtility.UrlDecode(token);
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            // Redirect or return an error indicating user not found
+            return BadRequest("User not found");
+        }
+
+        var result = await _userManager.ConfirmEmailAsync(user, token);
+        if (!result.Succeeded)
+        {
+            // Redirect or return an error indicating failed email confirmation
+            return BadRequest("Failed to confirm email");
+        }
+
+        // Redirect or return a success message indicating successful email confirmation
+        return Ok("Email confirmed successfully");
+    }
+
+
     [HttpGet("external-login")]
     public IActionResult ExternalLogin(string provider)
     {
@@ -242,7 +267,7 @@ public class AccountsController : ControllerBase
 
 
 
-        [HttpPost]
+    [HttpPost]
     [Route("refresh-token")]
     public async Task<IActionResult> RefreshToken(TokenModel? tokenModel)
     {
@@ -254,12 +279,12 @@ public class AccountsController : ControllerBase
         var accessToken = tokenModel.AccessToken;
         var refreshToken = tokenModel.RefreshToken;
         var principal = _configuration.GetPrincipalFromExpiredToken(accessToken);
-        
+
         if (principal == null)
         {
             return BadRequest("Invalid access token or refresh token");
         }
-        
+
         var username = principal.Identity!.Name;
         var user = await _userManager.FindByNameAsync(username!);
 
@@ -280,7 +305,7 @@ public class AccountsController : ControllerBase
             refreshToken = newRefreshToken
         });
     }
-    
+
     [Authorize]
     [HttpPost]
     [Route("revoke/{username}")]
@@ -294,7 +319,7 @@ public class AccountsController : ControllerBase
 
         return Ok();
     }
-    
+
     [Authorize]
     [HttpPost]
     [Route("revoke-all")]

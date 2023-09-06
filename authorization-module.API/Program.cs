@@ -51,9 +51,23 @@ builder.Services.AddAuthorization(options => options.DefaultPolicy =
         .RequireAuthenticatedUser()
         .Build());
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<long>>()
+    // Identity options configuration...
+    // Register the DataProtectorTokenProvider service
+    .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>(TokenOptions.DefaultProvider)
     .AddEntityFrameworkStores<DataContext>()
     .AddUserManager<UserManager<ApplicationUser>>()
     .AddSignInManager<SignInManager<ApplicationUser>>();
+
+
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    // Other Identity options
+
+    // Enable email confirmation
+    options.SignIn.RequireConfirmedEmail = true;
+});
+
+
 
 builder.Services.AddSwaggerGen(option =>
 {

@@ -5,3 +5,4 @@ riderModule.iml
 /_ReSharper.Caches/
 .idea
 *.vs/
+authorization-module.API/appsettings.Development.json
