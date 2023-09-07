@@ -57,9 +57,13 @@ public class AccountsController : ControllerBase
         }
 
         var user = _context.Users.FirstOrDefault(u => u.Email == request.Email);
-
         if (user is null)
             return Unauthorized();
+
+        var isEmailConfirmed = await _userManager.IsEmailConfirmedAsync(user);
+        if(!isEmailConfirmed)
+            return Unauthorized("Corfirm your account");
+            
 
         var roleIds = await _context.UserRoles.Where(r => r.UserId == user.Id).Select(x => x.RoleId).ToListAsync();
         var roles = _context.Roles.Where(x => roleIds.Contains(x.Id)).ToList();
@@ -130,7 +134,7 @@ public class AccountsController : ControllerBase
                 client.DeliveryMethod = SmtpDeliveryMethod.Network;
                 client.UseDefaultCredentials = false;
                 client.EnableSsl = true;
-                client.Credentials = new NetworkCredential(_configuration.GetSection("Email:UserName").Get<string>(), "hdfqlpwyrsxpwuui");
+                client.Credentials = new NetworkCredential(_configuration.GetSection("Email:UserName").Get<string>(), _configuration.GetSection("Email:Password").Get<string>());
                 using (var message = new MailMessage(
                     from: new MailAddress(_configuration.GetSection("Email:Address").Get<string>(), _configuration.GetSection("Email:DisplayName").Get<string>()),
                     to: new MailAddress($"{userEmail}", "Client")
