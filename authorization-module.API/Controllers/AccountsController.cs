@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RabbitMQ.Client;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Mail;
@@ -32,6 +33,60 @@ public class AccountsController : ControllerBase
         _context = context;
         _userManager = userManager;
         _configuration = configuration;
+    }
+
+    [HttpPost("user-ids-sync")]
+    public async Task<IActionResult> UserSynchronization()
+    {
+        try
+        {
+            var userIds = _context.Users.Where(e => true).Select(x => x.Id).ToList();
+            await SendUserIds(userIds);
+            return Ok();
+        }
+        catch(Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
+
+    private async Task<bool> SendUserIds(List<long> userIds)
+    {
+        try
+        {
+            var factory = new ConnectionFactory 
+            { 
+                HostName = _configuration.GetSection("RabbitMq:HostName").Get<string>(),
+                UserName = _configuration.GetSection("RabbitMq:UserName").Get<string>(),
+                Password = _configuration.GetSection("RabbitMq:Password").Get<string>()
+            };
+            using var connection = factory.CreateConnection();
+            using var channel = connection.CreateModel();
+
+            channel.QueueDeclare(queue: _configuration.GetSection("RabbitMq:Queue").Get<string>(),
+                                 durable: false,
+                                 exclusive: false,
+                                 autoDelete: false,
+                                 arguments: null);
+
+            foreach (var userId in userIds)
+            {
+                var message = userId.ToString();
+                var body = Encoding.UTF8.GetBytes(message);
+
+                channel.BasicPublish(exchange: string.Empty,
+                                     routingKey: _configuration.GetSection("RabbitMq:RoutingKey").Get<string>(),
+                                     basicProperties: null,
+                                     body: body);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception(ex.Message);
+        }
     }
 
     [HttpPost("login")]
@@ -61,9 +116,9 @@ public class AccountsController : ControllerBase
             return Unauthorized();
 
         var isEmailConfirmed = await _userManager.IsEmailConfirmedAsync(user);
-        if(!isEmailConfirmed)
+        if (!isEmailConfirmed)
             return Unauthorized("Corfirm your account");
-            
+
 
         var roleIds = await _context.UserRoles.Where(r => r.UserId == user.Id).Select(x => x.RoleId).ToListAsync();
         var roles = _context.Roles.Where(x => roleIds.Contains(x.Id)).ToList();
@@ -159,25 +214,24 @@ public class AccountsController : ControllerBase
     {
         if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
         {
-            // Redirect or return an error indicating invalid parameters
             return BadRequest("Invalid email confirmation parameters");
         }
-        //token = HttpUtility.UrlDecode(token);
+
         var user = await _userManager.FindByIdAsync(userId);
         if (user == null)
         {
-            // Redirect or return an error indicating user not found
             return BadRequest("User not found");
         }
 
         var result = await _userManager.ConfirmEmailAsync(user, token);
         if (!result.Succeeded)
         {
-            // Redirect or return an error indicating failed email confirmation
             return BadRequest("Failed to confirm email");
         }
 
-        // Redirect or return a success message indicating successful email confirmation
+
+        await SendUserIds(new List<long> { user.Id });
+
         return Ok("Email confirmed successfully");
     }
 
