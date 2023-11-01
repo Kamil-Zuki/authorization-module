@@ -19,7 +19,7 @@ using System.Web;
 namespace authorization_module.API.Controllers;
 
 [ApiController]
-[Route("auth")]
+[Route("api/v1/auth")]
 public class AccountsController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -44,7 +44,7 @@ public class AccountsController : ControllerBase
             await SendUserIds(userIds);
             return Ok();
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             return StatusCode(500, ex.Message);
         }
@@ -55,9 +55,10 @@ public class AccountsController : ControllerBase
     {
         try
         {
-            var factory = new ConnectionFactory 
-            { 
+            var factory = new ConnectionFactory
+            {
                 HostName = _configuration.GetSection("RabbitMq:HostName").Get<string>(),
+                Port = 5672,
                 UserName = _configuration.GetSection("RabbitMq:UserName").Get<string>(),
                 Password = _configuration.GetSection("RabbitMq:Password").Get<string>()
             };
@@ -85,6 +86,7 @@ public class AccountsController : ControllerBase
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Error: {ex.Message}");
             throw new Exception(ex.Message);
         }
     }
@@ -168,10 +170,13 @@ public class AccountsController : ControllerBase
             return BadRequest(result.Errors);
         }
 
-        var tokenn = (await _userManager.GenerateEmailConfirmationTokenAsync(user)).Trim();
-        var encodedToken = HttpUtility.UrlEncode(tokenn);
-        var confirmationLink = $"{Request.Scheme}://{Request.Host}/auth/confirm-email?userId={user.Id}&token={encodedToken}";
-
+        var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+        var codeHtmlVersion = HttpUtility.UrlEncode(code);
+        Console.WriteLine("----------");
+        Console.WriteLine(codeHtmlVersion);
+        Console.WriteLine("----------");
+        //var confirmationLink = $"{Request.Scheme}://{Request.Host}/auth/confirm-email?userId={user.Id}&token={encodedToken}";
+        var confirmationLink = $"http://localhost:81/auth/confirm-email?userId={user.Id}&token={codeHtmlVersion}";
         await SendConfirmationEmail(user.Email, confirmationLink);
 
         return Ok("Registration successful. Please check your email for a confirmation link.");
@@ -223,13 +228,16 @@ public class AccountsController : ControllerBase
             return BadRequest("User not found");
         }
 
+        Console.WriteLine("Dog----------");
+        Console.WriteLine(token);
+        Console.WriteLine("in Street----------");
         var result = await _userManager.ConfirmEmailAsync(user, token);
         if (!result.Succeeded)
         {
             return BadRequest("Failed to confirm email");
         }
 
-
+        Console.WriteLine("Send Users Ids Starts");
         await SendUserIds(new List<long> { user.Id });
 
         return Ok("Email confirmed successfully");
