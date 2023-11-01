@@ -61,9 +61,6 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole<long>>()
 
 builder.Services.Configure<IdentityOptions>(options =>
 {
-    // Other Identity options
-
-    // Enable email confirmation
     options.SignIn.RequireConfirmedEmail = true;
 });
 
