@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Org.BouncyCastle.Tls;
 using RabbitMQ.Client;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
@@ -42,7 +43,7 @@ public class AccountsController : ControllerBase
         {
             var userIds = _context.Users.Where(e => true).Select(x => x.Id).ToList();
             await SendUserIds(userIds);
-            return Ok();
+            return Ok(userIds);
         }
         catch (Exception ex)
         {
@@ -60,8 +61,10 @@ public class AccountsController : ControllerBase
                 HostName = _configuration.GetSection("RabbitMq:HostName").Get<string>(),
                 Port = 5672,
                 UserName = _configuration.GetSection("RabbitMq:UserName").Get<string>(),
-                Password = _configuration.GetSection("RabbitMq:Password").Get<string>()
+                Password = _configuration.GetSection("RabbitMq:Password").Get<string>(),
             };
+
+
             using var connection = factory.CreateConnection();
             using var channel = connection.CreateModel();
 
@@ -71,7 +74,7 @@ public class AccountsController : ControllerBase
                                  autoDelete: false,
                                  arguments: null);
 
-            foreach (var userId in userIds)
+            foreach (var userId in userIds) 
             {
                 var message = userId.ToString();
                 var body = Encoding.UTF8.GetBytes(message);
@@ -176,7 +179,8 @@ public class AccountsController : ControllerBase
         Console.WriteLine(codeHtmlVersion);
         Console.WriteLine("----------");
         //var confirmationLink = $"{Request.Scheme}://{Request.Host}/auth/confirm-email?userId={user.Id}&token={encodedToken}";
-        var confirmationLink = $"http://localhost:81/auth/confirm-email?userId={user.Id}&token={codeHtmlVersion}";
+        var confirmationLink = $"{_configuration.GetSection("ConfirmationLink").Get<string>()}={user.Id}&token={codeHtmlVersion}";
+        
         await SendConfirmationEmail(user.Email, confirmationLink);
 
         return Ok("Registration successful. Please check your email for a confirmation link.");
@@ -228,9 +232,6 @@ public class AccountsController : ControllerBase
             return BadRequest("User not found");
         }
 
-        Console.WriteLine("Dog----------");
-        Console.WriteLine(token);
-        Console.WriteLine("in Street----------");
         var result = await _userManager.ConfirmEmailAsync(user, token);
         if (!result.Succeeded)
         {
