@@ -36,20 +36,20 @@ public class AccountsController : ControllerBase
         _configuration = configuration;
     }
 
-    [HttpPost("user-ids-sync")]
-    public async Task<IActionResult> UserSynchronization()
-    {
-        try
-        {
-            var userIds = _context.Users.Where(e => true).Select(x => x.Id).ToList();
-            await SendUserIds(userIds);
-            return Ok(userIds);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, ex.Message);
-        }
-    }
+    //[HttpPost("user-ids-sync")]
+    //public async Task<IActionResult> UserSynchronization()
+    //{
+    //    try
+    //    {
+    //        var userIds = _context.Users.Where(e => true).Select(x => x.Id).ToList();
+    //        await SendUserIds(userIds);
+    //        return Ok(userIds);
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        return StatusCode(500, ex.Message);
+    //    }
+    //}
 
 
     private async Task<bool> SendUserIds(List<long> userIds)
@@ -76,8 +76,8 @@ public class AccountsController : ControllerBase
 
             foreach (var userId in userIds) 
             {
-                var message = userId.ToString();
-                var body = Encoding.UTF8.GetBytes(message);
+                string? message = userId.ToString();
+                byte[]? body = Encoding.UTF8.GetBytes(message);
 
                 channel.BasicPublish(exchange: string.Empty,
                                      routingKey: _configuration.GetSection("RabbitMq:RoutingKey").Get<string>(),
