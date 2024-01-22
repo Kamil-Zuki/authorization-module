@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Org.BouncyCastle.Tls;
 using RabbitMQ.Client;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
@@ -74,7 +73,7 @@ public class AccountsController : ControllerBase
                                  autoDelete: false,
                                  arguments: null);
 
-            foreach (var userId in userIds) 
+            foreach (var userId in userIds)
             {
                 string? message = userId.ToString();
                 byte[]? body = Encoding.UTF8.GetBytes(message);
@@ -152,10 +151,12 @@ public class AccountsController : ControllerBase
         }
         if (await _userManager.FindByEmailAsync(request.Email) != null)
             return BadRequest("The user with the specified email address already exists");
+
+
         var user = new ApplicationUser
         {
             Email = request.Email,
-            UserName = request.Email // Use email as the username
+            UserName = await GenerateUniqueUsername("User", 10)
         };
 
         var result = await _userManager.CreateAsync(user, request.Password);
@@ -180,12 +181,31 @@ public class AccountsController : ControllerBase
         Console.WriteLine("----------");
         //var confirmationLink = $"{Request.Scheme}://{Request.Host}/auth/confirm-email?userId={user.Id}&token={encodedToken}";
         var confirmationLink = $"{_configuration.GetSection("ConfirmationLink").Get<string>()}={user.Id}&token={codeHtmlVersion}";
-        
+
         await SendConfirmationEmail(user.Email, confirmationLink);
 
         return Ok("Registration successful. Please check your email for a confirmation link.");
     }
 
+    private static string GenerateRandomString(int length)
+    {
+        var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        var bytes = new byte[length];
+        rng.GetBytes(bytes);
+        var result = Convert.ToBase64String(bytes).Substring(0, length);
+        return result;
+    }
+
+    private async Task<string> GenerateUniqueUsername(string prefix, int length)
+    {
+        var baseUsername = prefix + GenerateRandomString(length);
+        var counter = 1;
+        while (await _userManager.FindByNameAsync(baseUsername) != null)
+        {
+            baseUsername = prefix + GenerateRandomString(length - counter.ToString().Length) + counter++;
+        }
+        return baseUsername;
+    }
 
     private async Task SendConfirmationEmail(string userEmail, string confirmationLink)
     {
