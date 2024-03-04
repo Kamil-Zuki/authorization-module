@@ -6,6 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <UserSecretsId>5a041859-96fc-40fe-95c7-8a1d471e2044</UserSecretsId>
+        <DockerfileContext>..\..\api-gateway\api-gateway</DockerfileContext>
     </PropertyGroup>
 
     <ItemGroup>
