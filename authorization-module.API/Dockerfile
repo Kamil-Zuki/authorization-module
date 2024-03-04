@@ -4,10 +4,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER app
 WORKDIR /app
 EXPOSE 80
-<<<<<<< HEAD
-=======
-EXPOSE 43
->>>>>>> d41bd98a72a2bb3a39e73655f4d908f75ecfe9eb
+
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
