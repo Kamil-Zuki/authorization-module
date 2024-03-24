@@ -28,19 +28,13 @@
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
-<<<<<<< HEAD:authorization-module.API/Dockerfile
 EXPOSE 80
-=======
-EXPOSE 8080
-EXPOSE 8081
->>>>>>> da72d652bfff2dcd0eed73a9cc757b7c44b5f994:Dockerfile
-
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 # Adjust the path to correctly reference the .csproj file from the Docker build context
-COPY ["../authorization-module/authorization-module.API/authorization-module.API.csproj", "authorization-module.API/"]
+COPY ["./authorization-module.API/authorization-module.API.csproj", "authorization-module.API/"]
 RUN dotnet restore "authorization-module.API/authorization-module.API.csproj"
 
 # Copy everything else and build
