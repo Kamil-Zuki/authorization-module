@@ -10,7 +10,9 @@ using authorization_module.API.Data.Entities;
 using authorization_module.API.Services.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
+#if RELEASE
 builder.WebHost.UseUrls("http://*:80");
+#endif
 builder.Services.AddControllers();
 builder.Services.AddDbContext<DataContext>(opt => 
     opt.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
