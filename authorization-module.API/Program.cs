@@ -107,7 +107,7 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "authorization-module/swagger";
 });
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseAuthentication();
