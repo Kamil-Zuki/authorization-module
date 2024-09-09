@@ -14,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://*:80");
 #endif
 builder.Services.AddControllers();
+var asd = builder.Configuration.GetConnectionString("Db");
 builder.Services.AddDbContext<DataContext>(opt => 
     opt.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
 builder.Services.AddCors(c => c.AddPolicy("cors", opt =>
