@@ -259,7 +259,7 @@ public class AccountsController : ControllerBase
         }
 
         Console.WriteLine("Send Users Ids Starts");
-        await SendUserIds(new List<long> { user.Id });
+        //await SendUserIds(new List<long> { user.Id });
 
         return Ok("Email confirmed successfully");
     }
