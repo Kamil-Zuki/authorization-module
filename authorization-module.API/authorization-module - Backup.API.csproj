@@ -7,7 +7,6 @@
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <UserSecretsId>5a041859-96fc-40fe-95c7-8a1d471e2044</UserSecretsId>
         <DockerfileContext>..\..\api-gateway\api-gateway</DockerfileContext>
-        <RootNamespace>$(MSBuildProjectName.Replace("-", "_"))</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
@@ -46,6 +45,7 @@
     <ItemGroup>
       <Folder Include="Controllers\" />
       <Folder Include="Migrations\" />
+      <Folder Include="Services\" />
     </ItemGroup>
 
 </Project>

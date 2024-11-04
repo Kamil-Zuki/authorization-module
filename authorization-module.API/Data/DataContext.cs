@@ -1,18 +1,15 @@
-using Microsoft.AspNetCore.Identity;
+using authorization_module.API.Data.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using authorization_module.API.Data.Entities;
 
 namespace authorization_module.API.Data;
 
-public sealed class DataContext : IdentityDbContext<ApplicationUser, IdentityRole<long>, long>
+public sealed class DataContext : IdentityDbContext<ApplicationUser>
 {
-    public DataContext (DbContextOptions<DataContext> options)
-        : base(options)
-    {   
-        Database.Migrate();
-    }
+    public DbSet<ApplicationUser> ApplicationUsers { get; set; } = null!;
 
-    public DbSet<Application> Applications { get; set; } = null!;
-    public DbSet<SampleData> SampleDatas { get; set; } = null!;
+    public DataContext(DbContextOptions<DataContext> options)
+        : base(options)
+    {
+    }
 }
