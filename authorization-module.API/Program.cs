@@ -25,8 +25,8 @@ builder.Services.AddDbContext<DataContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
-    .AddEntityFrameworkStores<DataContext>()
-    .AddDefaultTokenProviders();
+        .AddEntityFrameworkStores<DataContext>()
+        .AddDefaultTokenProviders();
 
 builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
 {
