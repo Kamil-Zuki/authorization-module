@@ -1,105 +1,119 @@
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
-using authorization_module.API.Services.Identity;
+using authorization_module.API.Interfaces;
+using authorization_module.API.Services;
+using Duende.IdentityServer.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.Filters;
+using System.Text;
+using Secret = Duende.IdentityServer.Models.Secret;
 
 var builder = WebApplication.CreateBuilder(args);
+
 #if RELEASE
 builder.WebHost.UseUrls("http://*:80");
 #endif
+
 builder.Services.AddControllers();
-var asd = builder.Configuration.GetConnectionString("Db");
-builder.Services.AddDbContext<DataContext>(opt => 
+
+builder.Services.AddDbContext<DataContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
-builder.Services.AddCors(c => c.AddPolicy("cors", opt =>
+
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
+        .AddEntityFrameworkStores<DataContext>()
+        .AddDefaultTokenProviders();
+
+builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
 {
-    opt.AllowAnyHeader();
-    //opt.AllowCredentials();
-    opt.AllowAnyMethod();
-    opt.AllowAnyOrigin();
-    //opt.WithOrigins(builder.Configuration.GetSection("Cors:Urls").Get<string[]>()!);
+    policy.AllowAnyHeader()
+          .AllowAnyMethod()
+          .AllowAnyOrigin();
 }));
-builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddAuthentication(opt => {
-        opt.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        opt.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
+
+builder.Services.AddIdentityServer()
+    .AddInMemoryClients(
+    [
+        new Client
         {
-            ValidateIssuer = false,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"]!,
-            ValidAudience = builder.Configuration["Jwt:Audience"]!,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"]!))
-        };
-    })
-    .AddVkontakte(options =>
-    {
-        options.ClientId = "YOUR_CLIENT_ID";
-        options.ClientSecret = "YOUR_CLIENT_SECRET";
-    });
-builder.Services.AddAuthorization(options => options.DefaultPolicy =
-    new AuthorizationPolicyBuilder
-            (JwtBearerDefaults.AuthenticationScheme)
-        .RequireAuthenticatedUser()
-        .Build());
-builder.Services.AddIdentity<ApplicationUser, IdentityRole<long>>()
-    // Identity options configuration...
-    // Register the DataProtectorTokenProvider service
-    .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>(TokenOptions.DefaultProvider)
-    .AddEntityFrameworkStores<DataContext>()
-    .AddUserManager<UserManager<ApplicationUser>>()
-    .AddSignInManager<SignInManager<ApplicationUser>>();
+            ClientId = "serviceA",
+            AllowedGrantTypes = GrantTypes.ClientCredentials,
+            ClientSecrets = { new Secret("serviceA-secret".Sha256()) },
+            AllowedScopes = { "serviceA.read", "serviceA.write" }
+        },
+        new Client
+        {
+            ClientId = "serviceB",
+            AllowedGrantTypes = GrantTypes.ClientCredentials,
+            ClientSecrets = { new Secret("serviceB-secret".Sha256()) },
+            AllowedScopes = { "serviceB.read", "serviceB.write" }
+        }
+    ])
+    .AddInMemoryApiScopes(
+    [
+        new ApiScope("serviceA.read", "Read access to Service A"),
+        new ApiScope("serviceA.write", "Write access to Service A"),
+        new ApiScope("serviceB.read", "Read access to Service B"),
+        new ApiScope("serviceB.write", "Write access to Service B")
+    ])
+    .AddDeveloperSigningCredential();
 
-
-builder.Services.Configure<IdentityOptions>(options =>
+builder.Services.AddSwaggerGen(options =>
 {
-    options.SignIn.RequireConfirmedEmail = true;
-});
-
-
-
-builder.Services.AddSwaggerGen(option =>
-{
-    option.SwaggerDoc("v1", new OpenApiInfo { Title = "Auth API", Version = "v1" });
-    option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Auth API", Version = "v1" });
+    options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
-        Description = "Please enter a valid token",
         Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        BearerFormat = "JWT",
-        Scheme = "Bearer"
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = JwtBearerDefaults.AuthenticationScheme,
+        BearerFormat = "JWT"
     });
-    option.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[]{}
-        }
-    });
+    options.OperationFilter<SecurityRequirementsOperationFilter>();
 });
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration.GetValue<string>("Jwt:Issuer"),
+        ValidAudience = builder.Configuration.GetValue<string>("Jwt:Audience"),
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetValue<string>("Jwt:Secret")!))
+    };
+});
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddScoped<ITokenService, TokenService>();
+
 
 var app = builder.Build();
 
-app.UseSwagger(c => {
+app.UseCors("cors");
+
+app.UseAuthentication();
+
+app.UseAuthorization();
+
+app.UseHttpsRedirection();
+
+app.UseIdentityServer();
+
+app.UseSwagger(c =>
+{
     c.RouteTemplate = "authorization-module/swagger/{documentname}/swagger.json";
 });
 app.UseSwaggerUI(c =>
@@ -108,12 +122,6 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "authorization-module/swagger";
 });
 
-//app.UseHttpsRedirection();
-app.UseRouting();
-
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseCors("cors");
 app.MapControllers();
 
 app.Run();
