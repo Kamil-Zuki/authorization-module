@@ -11,5 +11,6 @@ public sealed class DataContext : IdentityDbContext<ApplicationUser>
     public DataContext(DbContextOptions<DataContext> options)
         : base(options)
     {
+        Database.EnsureCreated();
     }
 }
