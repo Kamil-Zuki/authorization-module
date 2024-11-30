@@ -1,69 +1,53 @@
-using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
 using authorization_module.API.Interfaces;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
-namespace authorization_module.API.Controllers;
-
-[ApiController]
-[Route("api/v1/auth")]
-public class AccountsController : ControllerBase
+namespace authorization_module.API.Controllers
 {
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly ITokenService _tokenService;
-    public AccountsController(UserManager<ApplicationUser> userManager, 
-        SignInManager<ApplicationUser> signInManager,
-        ITokenService tokenService)
+    [ApiController]
+    [Route("api/v1/auth")]
+    public class AccountsController(IAuthService authService)
+        : ControllerBase
     {
-        _userManager = userManager;
-        _signInManager = signInManager;
-        _tokenService = tokenService;
-    }
+        private readonly IAuthService _authService = authService;
 
-    [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterDto model)
-    {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-
-        var user = new ApplicationUser
+        [HttpPost("register")]
+        public async Task<ActionResult<AuthResultDto>> Register([FromBody] RegisterDto model)
         {
-            UserName = model.UserName,
-            Email = model.Email
-        };
+            var result = await _authService.RegisterUserAsync(model);
 
-        var result = await _userManager.CreateAsync(user, model.Password);
-        if (!result.Succeeded)
-        {
-            foreach (var error in result.Errors)
+            if (result.Succeeded)
             {
-                ModelState.AddModelError(string.Empty, error.Description);
+                return Ok(result);
             }
-            return BadRequest(ModelState);
+
+            return BadRequest(result);
         }
 
-        //await _userManager.AddToRoleAsync(user, "user");
-
-        return Ok("Registration successful");
-    }
-
-    [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginDto model)
-    {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-
-        var result = await _signInManager.PasswordSignInAsync(model.UserName, model.Password, false, lockoutOnFailure: false);
-
-        if (!result.Succeeded)
+        [HttpPost("login")]
+        public async Task<ActionResult<AuthResultDto>> Login([FromBody] LoginDto model)
         {
-            return Unauthorized("Invalid login attempt");
+            var result = await _authService.LoginUserAsync(model);
+
+            if (result.Succeeded)
+            {
+                return Ok(result);
+            }
+
+            return Unauthorized(result);
         }
 
-        var token = _tokenService.GenerateJwtToken(model.UserName);
+        [HttpGet("confirm-email")]
+        public async Task<IActionResult> ConfirmEmail(string userId, string token)
+        {
+            var result = await _authService.ConfirmEmailAsync(userId, token);
 
-        return Ok(new { message = "Login successful", token });
+            if (result.Succeeded)
+            {
+                return Ok(new { message = "Email confirmed successfully." });
+            }
+
+            return BadRequest(result);
+        }
     }
-
-
 }
