@@ -19,9 +19,19 @@ public class AuthService(UserManager<ApplicationUser> userManager,
 
     public async Task<AuthResultDto> RegisterUserAsync(RegisterDto model)
     {
+        if (model.Password != model.PasswordConfirmation)
+        {
+            return new AuthResultDto
+            (
+                Succeeded: false,
+                Errors: ["Passwords do not match"]
+            );
+        }
+
+        string userName = string.Concat("User_", Guid.NewGuid().ToString("N").AsSpan(0, 8));
         var user = new ApplicationUser
         {
-            UserName = model.UserName,
+            UserName = userName,
             Email = model.Email
         };
 
@@ -58,8 +68,17 @@ public class AuthService(UserManager<ApplicationUser> userManager,
 
     public async Task<AuthResultDto> LoginUserAsync(LoginDto model)
     {
+        var user = await _userManager.FindByEmailAsync(model.Email);
+        if (user == null)
+        {
+            return new AuthResultDto(
+                Succeeded: false,
+                Errors: ["User not found"]
+            );
+        }
+
         var result = await _signInManager.PasswordSignInAsync(
-            model.UserName, model.Password, false, lockoutOnFailure: false);
+            user.UserName!, model.Password, false, lockoutOnFailure: false);
 
         if (!result.Succeeded)
         {
@@ -68,15 +87,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
                 Errors: ["Invalid login attempt"]
             );
         }
-
-        var user = await _userManager.FindByNameAsync(model.UserName);
-        if (user == null)
-        {
-            return new AuthResultDto(
-                Succeeded: false,
-                Errors: ["User not found"]
-            );
-        }
+        
 
         if (!user.EmailConfirmed)
         {
@@ -87,7 +98,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
         }
 
 
-        var token = _tokenService.GenerateJwtToken(model.UserName);
+        var token = _tokenService.GenerateJwtToken(user.UserName!);
 
         return new AuthResultDto(
             Succeeded: true,
