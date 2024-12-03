@@ -8,12 +8,13 @@ namespace authorization_module.API.Services;
 
 public class TokenService(IConfiguration configuration) : ITokenService
 {
-    public string GenerateJwtToken(string username)
+    public string GenerateJwtToken(string userId)
     {
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, username),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Sub, userId),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration.GetValue<string>("Jwt:Secret")!));

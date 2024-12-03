@@ -113,7 +113,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
         }
 
 
-        var token = _tokenService.GenerateJwtToken(user.UserName!);
+        var token = _tokenService.GenerateJwtToken(user.Id);
 
         return new AuthResultDto(
             Succeeded: true,
