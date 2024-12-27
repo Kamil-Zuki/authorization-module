@@ -12,42 +12,64 @@ namespace authorization_module.API.Controllers
         private readonly IAuthService _authService = authService;
 
         [HttpPost("register")]
-        public async Task<ActionResult<AuthResultDto>> Register([FromBody] RegisterDto model)
+        public async Task<ActionResult<StringResultDto>> Register([FromBody] RegisterDto model)
         {
-            var result = await _authService.RegisterUserAsync(model);
-
-            if (result.Succeeded)
+            try
             {
-                return Ok(result);
+                return await _authService.RegisterUserAsync(model);
             }
-
-            return BadRequest(result);
+            catch (ResponseException ex)
+            {
+                return BadRequest(new
+                {
+                    ex.Errors
+                });
+            }
+            catch (Exception)
+            {
+                throw;
+            }
         }
 
         [HttpPost("login")]
-        public async Task<ActionResult<AuthResultDto>> Login([FromBody] LoginDto model)
+        public async Task<ActionResult<StringResultDto>> Login([FromBody] LoginDto model)
         {
-            var result = await _authService.LoginUserAsync(model);
-
-            if (result.Succeeded)
+            try
             {
-                return Ok(result);
+                return await _authService.LoginUserAsync(model);
             }
-
-            return Unauthorized(result);
+            catch (ResponseException ex)
+            {
+                return BadRequest(new
+                {
+                    ex.Errors
+                });
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+            //return Unauthorized(result);
         }
 
         [HttpGet("confirm-email")]
-        public async Task<IActionResult> ConfirmEmail(string userId, string token)
+        public async Task<ActionResult<StringResultDto>> ConfirmEmail(string userId, string token)
         {
-            var result = await _authService.ConfirmEmailAsync(userId, token);
-
-            if (result.Succeeded)
+            try
             {
-                return Ok(new { message = "Email confirmed successfully." });
+                return await _authService.ConfirmEmailAsync(userId, token);
             }
-
-            return BadRequest(result);
+            catch (ResponseException ex)
+            {
+                return BadRequest(new
+                {
+                    ex.Errors
+                });
+            }
+            catch (Exception)
+            {
+                throw;
+            }
         }
     }
 }

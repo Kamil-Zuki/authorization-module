@@ -4,8 +4,8 @@ namespace authorization_module.API.Interfaces
 {
     public interface IAuthService
     {
-        Task<AuthResultDto> RegisterUserAsync(RegisterDto model);
-        Task<AuthResultDto> LoginUserAsync(LoginDto model);
-        Task<AuthResultDto> ConfirmEmailAsync(string userId, string token);
+        Task<StringResultDto> RegisterUserAsync(RegisterDto model);
+        Task<StringResultDto> LoginUserAsync(LoginDto model);
+        Task<StringResultDto> ConfirmEmailAsync(string userId, string token);
     }
 }
