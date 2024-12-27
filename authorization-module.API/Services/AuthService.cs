@@ -25,14 +25,14 @@ public class AuthService(UserManager<ApplicationUser> userManager,
     {
         if (model.Password != model.PasswordConfirmation)
         {
-            throw new ResponseException([new(){Code = 500,
+            throw new ResponseException([new(){Code = 400,
                 Message = "Passwords do not match"}]);
         }
 
         var existedUser = await _userManager.FindByEmailAsync(model.Email);
         if (existedUser != null && existedUser.EmailConfirmed)
         {
-            throw new ResponseException([new(){Code = 500,
+            throw new ResponseException([new(){Code = 400,
                 Message = "Confirmed user with such email already exists"}]);
         }
 
@@ -49,7 +49,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
             throw new ResponseException(
                 result.Errors.Select(e => new ErrorResponseMessage()
                 {
-                    Code = 500,
+                    Code = 400,
                     Message = e.Description
                 }).ToList()
             );
@@ -66,7 +66,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
 
         if (!emailSent)
         {
-            throw new ResponseException([new(){Code = 500,
+            throw new ResponseException([new(){Code = 400,
                 Message = "Failed to send confirmation email."}]);
         }
 
@@ -84,14 +84,14 @@ public class AuthService(UserManager<ApplicationUser> userManager,
 
         if (!result.Succeeded)
         {
-            throw new ResponseException([new(){Code = 500,
+            throw new ResponseException([new(){Code = 400,
                 Message = "Invalid login attempt"}]);
         }
 
 
         if (!user.EmailConfirmed)
         {
-            throw new ResponseException([new(){Code = 500,
+            throw new ResponseException([new(){Code = 400,
                 Message = "Email not confirmed"}]);
         }
 
@@ -106,7 +106,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
         var user = await _userManager.FindByIdAsync(userId);
         if (user == null)
         {
-            throw new ResponseException([new(){Code = 500,
+            throw new ResponseException([new(){Code = 400,
                 Message = "User not found"}]);
         }
 
@@ -116,7 +116,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
             throw new ResponseException(
                 result.Errors.Select(e => new ErrorResponseMessage()
                 {
-                    Code = 500,
+                    Code = 400,
                     Message = e.Description
                 }).ToList()
             );
