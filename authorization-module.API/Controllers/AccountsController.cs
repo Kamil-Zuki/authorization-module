@@ -1,75 +1,59 @@
 using authorization_module.API.Dtos;
 using authorization_module.API.Interfaces;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace authorization_module.API.Controllers
 {
     [ApiController]
     [Route("api/v1/auth")]
-    public class AccountsController(IAuthService authService)
-        : ControllerBase
+    public class AccountsController : ControllerBase
     {
-        private readonly IAuthService _authService = authService;
+        private readonly IAuthService _authService;
+        private readonly IValidator<UserRegistrationRequest> _userRegistrationValidator;
+        private readonly IValidator<UserLoginRequest> _userLoginValidator;
+
+        public AccountsController(
+            IAuthService authService,
+            IValidator<UserRegistrationRequest> userRegistrationValidator,
+            IValidator<UserLoginRequest> userLoginValidator)
+        {
+            _authService = authService;
+            _userRegistrationValidator = userRegistrationValidator;
+            _userLoginValidator = userLoginValidator;
+        }
 
         [HttpPost("register")]
-        public async Task<ActionResult<StringResultDto>> Register([FromBody] RegisterDto model)
+        public async Task<IActionResult> Register([FromBody] UserRegistrationRequest request)
         {
-            try
+            var validationResult = await _userRegistrationValidator.ValidateAsync(request);
+            if (!validationResult.IsValid)
             {
-                return await _authService.RegisterUserAsync(model);
+                return BadRequest(new { validationResult.Errors });
             }
-            catch (ResponseException ex)
-            {
-                return BadRequest(new
-                {
-                    ex.Errors
-                });
-            }
-            catch (Exception)
-            {
-                throw;
-            }
+
+            var result = await _authService.RegisterUserAsync(request);
+            return Created(string.Empty, new { Message = result.Data });
         }
 
         [HttpPost("login")]
-        public async Task<ActionResult<StringResultDto>> Login([FromBody] LoginDto model)
+        public async Task<ActionResult<StringResultDto>> Login([FromBody] UserLoginRequest request)
         {
-            try
+            var validationResult = await _userLoginValidator.ValidateAsync(request);
+            if (!validationResult.IsValid)
             {
-                return await _authService.LoginUserAsync(model);
+                return BadRequest(new { validationResult.Errors });
             }
-            catch (ResponseException ex)
-            {
-                return BadRequest(new
-                {
-                    ex.Errors
-                });
-            }
-            catch (Exception)
-            {
-                throw;
-            }
-            //return Unauthorized(result);
+
+            var result = await _authService.LoginUserAsync(request);
+            return Ok(result);
         }
 
         [HttpGet("confirm-email")]
-        public async Task<ActionResult<StringResultDto>> ConfirmEmail(string userId, string token)
+        public async Task<ActionResult<StringResultDto>> ConfirmEmail([FromQuery] ConfirmEmailRequest request)
         {
-            try
-            {
-                return await _authService.ConfirmEmailAsync(userId, token);
-            }
-            catch (ResponseException ex)
-            {
-                return BadRequest(new
-                {
-                    ex.Errors
-                });
-            }
-            catch (Exception)
-            {
-                throw;
-            }
+            var result = await _authService.ConfirmEmailAsync(request);
+            return Ok(result);
         }
     }
 }

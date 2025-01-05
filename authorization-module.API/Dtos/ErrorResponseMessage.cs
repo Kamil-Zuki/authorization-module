@@ -2,7 +2,7 @@
 
 public class ErrorResponseMessage
 {
-    public required int Code { get; set; }
-    public required string Message { get; set; }
+    public required int StatusCode { get; set; }
+    public required string ErrorMessage { get; set; }
 }
 

@@ -1,8 +1,12 @@
 using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
+using authorization_module.API.Dtos;
+using authorization_module.API.Exceptions;
 using authorization_module.API.Interfaces;
 using authorization_module.API.Services;
+using authorization_module.API.Validations;
 using Duende.IdentityServer.Models;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +15,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
+
 using Secret = Duende.IdentityServer.Models.Secret;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -101,6 +106,9 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
+//validation
+builder.Services.AddScoped<IValidator<UserRegistrationRequest>, UserRegistrationValidator>();
+builder.Services.AddScoped<IValidator<UserLoginRequest>, UserLoginValidator>();
 
 var app = builder.Build();
 
@@ -125,5 +133,7 @@ app.UseSwaggerUI(c =>
 });
 
 app.MapControllers();
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.Run();

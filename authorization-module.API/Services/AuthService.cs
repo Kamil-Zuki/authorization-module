@@ -20,23 +20,16 @@ public class AuthService(UserManager<ApplicationUser> userManager,
     private readonly IConfiguration _configuration = configuration;
     private readonly DataContext _dbContext = dbContext;
 
-
-    public async Task<StringResultDto> RegisterUserAsync(RegisterDto model)
+    public async Task<StringResultDto> RegisterUserAsync(UserRegistrationRequest model)
     {
-        if (model.Password != model.PasswordConfirmation)
-        {
-            throw new ResponseException([new(){Code = 400,
-                Message = "Passwords do not match"}]);
-        }
 
         var existedUser = await _userManager.FindByEmailAsync(model.Email);
         if (existedUser != null && existedUser.EmailConfirmed)
         {
-            throw new ResponseException([new(){Code = 400,
-                Message = "Confirmed user with such email already exists"}]);
+            throw new ResponseException("Confirmed user with such email already exists");
         }
 
-        string userName = string.Concat("User_", Guid.NewGuid().ToString("N").AsSpan(0, 8));
+        string userName = $"User_{Guid.NewGuid():N}"[..8];
         var user = new ApplicationUser
         {
             UserName = userName,
@@ -47,87 +40,75 @@ public class AuthService(UserManager<ApplicationUser> userManager,
         if (!result.Succeeded)
         {
             throw new ResponseException(
-                result.Errors.Select(e => new ErrorResponseMessage()
+                result.Errors.Select(e => new ErrorResponseMessage
                 {
-                    Code = 400,
-                    Message = e.Description
+                    StatusCode = 400,
+                    ErrorMessage = e.Description
                 }).ToList()
             );
         }
 
         var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-
         var encodedToken = Uri.EscapeDataString(token);
 
-        var confirmationUri = $"{_configuration.GetValue<string>("ConfirmationLink")}={user.Id}&token={encodedToken}";
+        var confirmationUri = $"{_configuration["ConfirmationLink"]}={user.Id}&token={encodedToken}";
         var emailSent = await _emailService.SendEmailAsync(user.Email,
             "Confirm your email",
             $"Please confirm your email by clicking the following link: {confirmationUri}");
 
         if (!emailSent)
         {
-            throw new ResponseException([new(){Code = 400,
-                Message = "Failed to send confirmation email."}]);
+            throw new ResponseException("Failed to send confirmation email");
         }
 
         return new StringResultDto("Confirm your email");
     }
 
-    public async Task<StringResultDto> LoginUserAsync(LoginDto model)
+    public async Task<StringResultDto> LoginUserAsync(UserLoginRequest model)
     {
         var user = await _userManager.FindByEmailAsync(model.Email)
-            ?? throw new ResponseException([new(){Code = 500,
-                Message = "User not found"}]);
+            ?? throw new ResponseException("User not found");
 
         var result = await _signInManager.PasswordSignInAsync(
             user.UserName!, model.Password, false, lockoutOnFailure: false);
 
         if (!result.Succeeded)
         {
-            throw new ResponseException([new(){Code = 400,
-                Message = "Invalid login attempt"}]);
+            throw new ResponseException("Invalid login attempt");
         }
-
 
         if (!user.EmailConfirmed)
         {
-            throw new ResponseException([new(){Code = 400,
-                Message = "Email not confirmed"}]);
+            throw new ResponseException("Email not confirmed");
         }
-
 
         var token = _tokenService.GenerateJwtToken(user.Id);
 
         return new StringResultDto(token);
     }
 
-    public async Task<StringResultDto> ConfirmEmailAsync(string userId, string token)
+    public async Task<StringResultDto> ConfirmEmailAsync(ConfirmEmailRequest request)
     {
-        var user = await _userManager.FindByIdAsync(userId);
-        if (user == null)
-        {
-            throw new ResponseException([new(){Code = 400,
-                Message = "User not found"}]);
-        }
+        var user = await _userManager.FindByIdAsync(request.UserId)
+            ?? throw new ResponseException("User not found");
 
-        var result = await _userManager.ConfirmEmailAsync(user, token);
+        var result = await _userManager.ConfirmEmailAsync(user, request.Token);
         if (!result.Succeeded)
         {
             throw new ResponseException(
-                result.Errors.Select(e => new ErrorResponseMessage()
+                result.Errors.Select(e => new ErrorResponseMessage
                 {
-                    Code = 400,
-                    Message = e.Description
+                    StatusCode = 400,
+                    ErrorMessage = e.Description
                 }).ToList()
             );
         }
-        var notConfirmedUsers = _dbContext.ApplicationUsers.Where(x => x.EmailConfirmed == false && x.Email == user.Email);
+
+        var notConfirmedUsers = _dbContext.ApplicationUsers
+            .Where(x => !x.EmailConfirmed && x.Email == user.Email);
         _dbContext.RemoveRange(notConfirmedUsers);
         await _dbContext.SaveChangesAsync();
 
         return new StringResultDto("Confirmation completed successfully");
     }
 }
-
-
-

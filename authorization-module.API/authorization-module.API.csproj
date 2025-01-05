@@ -18,6 +18,8 @@
       <PackageReference Include="AspNet.Security.OAuth.Vkontakte" Version="8.2.0" />
       <PackageReference Include="Duende.IdentityServer" Version="7.0.8" />
       <PackageReference Include="FluentEmail.Smtp" Version="3.0.2" />
+      <PackageReference Include="FluentValidation" Version="11.11.0" />
+      <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
       <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
       <PackageReference Include="Google.Apis.Gmail.v1" Version="1.68.0.3427" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
