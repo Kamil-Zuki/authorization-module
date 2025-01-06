@@ -82,7 +82,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
             throw new ResponseException("Email not confirmed");
         }
 
-        var token = _tokenService.GenerateJwtToken(user.Id);
+        var token = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
 
         return new StringResultDto(token);
     }

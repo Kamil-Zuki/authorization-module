@@ -8,11 +8,12 @@ namespace authorization_module.API.Services;
 
 public class TokenService(IConfiguration configuration) : ITokenService
 {
-    public string GenerateJwtToken(string userId)
+    public string GenerateJwtToken(string userId, string userName)
     {
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId),
+            new Claim(JwtRegisteredClaimNames.Name, userName),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
 
         };
