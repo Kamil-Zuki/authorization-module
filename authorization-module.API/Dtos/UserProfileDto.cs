@@ -2,7 +2,7 @@
 {
     public class UserProfileDto
     {
-        public string Email { get; set; }
-        public string Username { get; set; }
+        public string? Email { get; set; }
+        public string? Username { get; set; }
     }
 }

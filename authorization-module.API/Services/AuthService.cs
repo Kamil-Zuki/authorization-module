@@ -3,10 +3,7 @@ using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
 using authorization_module.API.Interfaces;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
 namespace authorization_module.API.Services;
 
@@ -14,7 +11,6 @@ public class AuthService : IAuthService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly ITokenService _tokenService; // Optional if fully delegating to IdentityServer
     private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
     private readonly DataContext _dbContext;
@@ -30,7 +26,6 @@ public class AuthService : IAuthService
     {
         _userManager = userManager;
         _signInManager = signInManager;
-        _tokenService = tokenService;
         _emailService = emailService;
         _configuration = configuration;
         _dbContext = dbContext;
@@ -120,10 +115,10 @@ public class AuthService : IAuthService
             );
         }
 
-        var notConfirmedUsers = _dbContext.ApplicationUsers
-            .Where(x => !x.EmailConfirmed && x.Email == user.Email);
-        _dbContext.RemoveRange(notConfirmedUsers);
-        await _dbContext.SaveChangesAsync();
+        //var notConfirmedUsers = _dbContext.ApplicationUsers
+        //    .Where(x => !x.EmailConfirmed && x.Email == user.Email);
+        //_dbContext.RemoveRange(notConfirmedUsers);
+        //await _dbContext.SaveChangesAsync();
 
         return new StringResultDto("Confirmation completed successfully");
     }

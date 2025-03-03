@@ -115,8 +115,8 @@ public class AccountsController : ControllerBase
         var result = await _authService.RefreshTokenAsync(request.RefreshToken);
         return Ok(new
         {
-            AccessToken = result.AccessToken,
-            RefreshToken = result.RefreshToken
+            result.AccessToken,
+            result.RefreshToken
         });
     }
 
