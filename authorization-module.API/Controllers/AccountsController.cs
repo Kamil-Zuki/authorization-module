@@ -161,38 +161,3 @@ public class AccountsController : ControllerBase
         return Ok(new { Message = result.Data });
     }
 }
-
-// Temporary Request DTOs (Define these in authorization_module.API.Dtos)
-public class ForgotPasswordRequest
-{
-    public required string Email { get; set; }
-}
-
-public class ResetPasswordRequest
-{
-    public required string Email { get; set; }
-    public required string Token { get; set; }
-    public required string NewPassword { get; set; }
-}
-
-public class ChangePasswordRequest
-{
-    public required string CurrentPassword { get; set; }
-    public required string NewPassword { get; set; }
-}
-
-public class RefreshTokenRequest
-{
-    public required string RefreshToken { get; set; }
-}
-
-public class UpdateProfileRequest
-{
-    public required string Username { get; set; }
-    public required string Email { get; set; }
-}
-
-public class ResendConfirmationRequest
-{
-    public required string Email { get; set; }
-}
