@@ -3,7 +3,6 @@ using authorization_module.API.Interfaces;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace authorization_module.API.Controllers;
 
