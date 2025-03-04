@@ -31,7 +31,7 @@ public class AccountsController : ControllerBase
         var validationResult = await _userRegistrationValidator.ValidateAsync(request);
         if (!validationResult.IsValid)
         {
-            return BadRequest(new { Errors = validationResult.Errors });
+            return BadRequest(new { validationResult.Errors });
         }
 
         var result = await _authService.RegisterUserAsync(request);
@@ -44,7 +44,7 @@ public class AccountsController : ControllerBase
         var validationResult = await _userLoginValidator.ValidateAsync(request);
         if (!validationResult.IsValid)
         {
-            return BadRequest(new { Errors = validationResult.Errors });
+            return BadRequest(new { validationResult.Errors });
         }
 
         var result = await _authService.LoginUserAsync(request);
