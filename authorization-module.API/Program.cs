@@ -1,7 +1,6 @@
 using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
-using authorization_module.API.Exceptions;
 using authorization_module.API.Interfaces;
 using authorization_module.API.Services;
 using authorization_module.API.Validations;
@@ -15,23 +14,25 @@ using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
 
-using Secret = Duende.IdentityServer.Models.Secret;
-
 var builder = WebApplication.CreateBuilder(args);
 
 #if RELEASE
-builder.WebHost.UseUrls("http://*:80");
+builder.WebHost.UseUrls("http://*:80"); // Consider HTTPS in production
 #endif
 
+// Add services
 builder.Services.AddControllers();
 
+// Database
 builder.Services.AddDbContext<DataContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
 
+// Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
-        .AddEntityFrameworkStores<DataContext>()
-        .AddDefaultTokenProviders();
+    .AddEntityFrameworkStores<DataContext>()
+    .AddDefaultTokenProviders();
 
+// CORS
 builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
 {
     policy.AllowAnyHeader()
@@ -39,88 +40,93 @@ builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
           .AllowAnyOrigin();
 }));
 
+// IdentityServer
 builder.Services.AddIdentityServer()
-    .AddInMemoryClients(
-    [
+    .AddAspNetIdentity<ApplicationUser>() // Integrate with Identity users
+    .AddConfigurationStore(options =>
+    {
+        options.ConfigureDbContext = b => b.UseNpgsql(builder.Configuration.GetConnectionString("Db"));
+    })
+    .AddOperationalStore(options =>
+    {
+        options.ConfigureDbContext = b => b.UseNpgsql(builder.Configuration.GetConnectionString("Db"));
+        options.EnableTokenCleanup = true; // Clean expired tokens
+        options.TokenCleanupInterval = 3600; // Hourly cleanup
+    })
+    .AddInMemoryClients(new[]
+    {
         new Client
         {
-            ClientId = "serviceA",
-            AllowedGrantTypes = GrantTypes.ClientCredentials,
-            ClientSecrets = { new Secret("serviceA-secret".Sha256()) },
-            AllowedScopes = { "serviceA.read", "serviceA.write" }
-        },
-        new Client
-        {
-            ClientId = "serviceB",
-            AllowedGrantTypes = GrantTypes.ClientCredentials,
-            ClientSecrets = { new Secret("serviceB-secret".Sha256()) },
-            AllowedScopes = { "serviceB.read", "serviceB.write" }
+            ClientId = "auth-microservice",
+            ClientSecrets = { new Secret("your-secret".Sha256()) },
+            AllowedGrantTypes = GrantTypes.ResourceOwnerPassword, // For username/password login
+            AllowedScopes = { "api1", "offline_access" }, // API access + refresh tokens
+            AllowOfflineAccess = true, // Enable refresh tokens
+            RefreshTokenUsage = TokenUsage.OneTimeOnly, // New refresh token each time
+            RefreshTokenExpiration = TokenExpiration.Sliding,
+            SlidingRefreshTokenLifetime = 604800 // 7 days
         }
-    ])
-    .AddInMemoryApiScopes(
-    [
-        new ApiScope("serviceA.read", "Read access to Service A"),
-        new ApiScope("serviceA.write", "Write access to Service A"),
-        new ApiScope("serviceB.read", "Read access to Service B"),
-        new ApiScope("serviceB.write", "Write access to Service B")
-    ])
-    .AddDeveloperSigningCredential();
+    })
+    .AddInMemoryApiScopes(new[]
+    {
+        new ApiScope("api1", "API Access"),
+        new ApiScope("offline_access", "Offline Access")
+    })
+    .AddDeveloperSigningCredential(); // Use a real cert in production
 
+// Swagger
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "Auth API", Version = "v1" });
     options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
-        In = ParameterLocation.Header,
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = JwtBearerDefaults.AuthenticationScheme,
-        BearerFormat = "JWT"
+        Type = SecuritySchemeType.OAuth2,
+        Flows = new OpenApiOAuthFlows
+        {
+            Password = new OpenApiOAuthFlow
+            {
+                TokenUrl = new Uri(builder.Configuration["IdentityServer:TokenEndpoint"]),
+                Scopes = new Dictionary<string, string>
+                {
+                    { "api1", "API Access" },
+                    { "offline_access", "Offline Access" }
+                }
+            }
+        }
     });
     options.OperationFilter<SecurityRequirementsOperationFilter>();
 });
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+// Authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration.GetValue<string>("Jwt:Issuer"),
-        ValidAudience = builder.Configuration.GetValue<string>("Jwt:Audience"),
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetValue<string>("Jwt:Secret")!))
-    };
-});
+        options.Authority = builder.Configuration["IdentityServer:Authority"];
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = false // Adjust based on your needs
+        };
+    });
 
+// Authorization
 builder.Services.AddAuthorization();
 
+// Additional services
+builder.Services.AddHttpClient(); // For AuthService token endpoint calls
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-
-//validation
 builder.Services.AddScoped<IValidator<UserRegistrationRequest>, UserRegistrationValidator>();
 builder.Services.AddScoped<IValidator<UserLoginRequest>, UserLoginValidator>();
 
 var app = builder.Build();
 
+// Middleware pipeline
 app.UseCors("cors");
-
 app.UseAuthentication();
-
 app.UseAuthorization();
-
-app.UseHttpsRedirection();
-
+app.UseHttpsRedirection(); // Remove if using HTTP only in RELEASE
 app.UseIdentityServer();
-
 app.UseSwagger(c =>
 {
     c.RouteTemplate = "authorization-module/swagger/{documentname}/swagger.json";
@@ -129,10 +135,11 @@ app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/authorization-module/swagger/v1/swagger.json", "Authorization API");
     c.RoutePrefix = "authorization-module/swagger";
+    c.OAuthClientId("auth-microservice");
+    c.OAuthClientSecret("your-secret");
+    c.OAuthUsePkce();
 });
-
 app.MapControllers();
-
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+// app.UseMiddleware<ExceptionHandlingMiddleware>(); // Uncomment if defined
 
 app.Run();

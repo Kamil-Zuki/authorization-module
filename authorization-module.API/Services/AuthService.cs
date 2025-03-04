@@ -4,6 +4,7 @@ using authorization_module.API.Dtos;
 using authorization_module.API.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace authorization_module.API.Services;
 
@@ -14,15 +15,15 @@ public class AuthService : IAuthService
     private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
     private readonly DataContext _dbContext;
-    private readonly IHttpClientFactory _httpClientFactory; // For calling IdentityServer token endpoint
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public AuthService(UserManager<ApplicationUser> userManager,
-                       SignInManager<ApplicationUser> signInManager,
-                       ITokenService tokenService,
-                       IEmailService emailService,
-                       IConfiguration configuration,
-                       DataContext dbContext,
-                       IHttpClientFactory httpClientFactory)
+    public AuthService(
+        UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
+        IEmailService emailService,
+        IConfiguration configuration,
+        DataContext dbContext,
+        IHttpClientFactory httpClientFactory)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -61,7 +62,6 @@ public class AuthService : IAuthService
 
         var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
         var encodedToken = Uri.EscapeDataString(token);
-
         var confirmationUri = $"{_configuration["ConfirmationLink"]}={user.Id}&token={encodedToken}";
         var emailSent = await _emailService.SendEmailAsync(user.Email,
             "Confirm your email",
@@ -93,9 +93,8 @@ public class AuthService : IAuthService
             throw new ResponseException("Email not confirmed");
         }
 
-        // Call IdentityServer token endpoint
         var tokenResponse = await GetTokenFromIdentityServerAsync(user.UserName!, model.Password);
-        return new StringResultDto(tokenResponse); // Contains access_token and refresh_token
+        return new StringResultDto(tokenResponse);
     }
 
     public async Task<StringResultDto> ConfirmEmailAsync(ConfirmEmailRequest request)
@@ -115,10 +114,10 @@ public class AuthService : IAuthService
             );
         }
 
-        //var notConfirmedUsers = _dbContext.ApplicationUsers
-        //    .Where(x => !x.EmailConfirmed && x.Email == user.Email);
-        //_dbContext.RemoveRange(notConfirmedUsers);
-        //await _dbContext.SaveChangesAsync();
+        var notConfirmedUsers = _dbContext.ApplicationUsers
+            .Where(x => !x.EmailConfirmed && x.Email == user.Email);
+        _dbContext.RemoveRange(notConfirmedUsers);
+        await _dbContext.SaveChangesAsync();
 
         return new StringResultDto("Confirmation completed successfully");
     }
@@ -216,29 +215,30 @@ public class AuthService : IAuthService
             await _userManager.AddLoginAsync(user, info);
         }
 
-        // Call IdentityServer token endpoint (use client credentials or external login flow)
-        var tokenResponse = await GetTokenFromIdentityServerAsync(user.UserName!, null); // Adjust for external login
+        var tokenResponse = await GetTokenFromIdentityServerAsync(user.UserName!, null);
         return new StringResultDto(tokenResponse);
     }
 
     public async Task<TokenResultDto> RefreshTokenAsync(string refreshToken)
     {
         var client = _httpClientFactory.CreateClient();
-        var response = await client.PostAsync(_configuration["IdentityServer:TokenEndpoint"], new FormUrlEncodedContent(new[]
+        var request = new FormUrlEncodedContent(new[]
         {
             new KeyValuePair<string, string>("grant_type", "refresh_token"),
             new KeyValuePair<string, string>("refresh_token", refreshToken),
-            new KeyValuePair<string, string>("client_id", "your-client-id"),
-            new KeyValuePair<string, string>("client_secret", "your-secret")
-        }));
+            new KeyValuePair<string, string>("client_id", _configuration["IdentityServer:ClientId"]),
+            new KeyValuePair<string, string>("client_secret", _configuration["IdentityServer:ClientSecret"])
+        });
 
+        var response = await client.PostAsync(_configuration["IdentityServer:TokenEndpoint"], request);
         if (!response.IsSuccessStatusCode)
         {
-            throw new ResponseException("Failed to refresh token");
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new ResponseException($"Failed to refresh token: {response.StatusCode} - {errorContent}");
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        var tokenData = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+        var tokenData = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
         return new TokenResultDto
         {
             AccessToken = tokenData["access_token"],
@@ -314,28 +314,56 @@ public class AuthService : IAuthService
         return new StringResultDto("If the email exists and is unconfirmed, a new link has been sent");
     }
 
-    // Helper Method to Call IdentityServer Token Endpoint
     private async Task<string> GetTokenFromIdentityServerAsync(string username, string? password)
     {
         var client = _httpClientFactory.CreateClient();
-        var request = new FormUrlEncodedContent(new[]
-        {
-            new KeyValuePair<string, string>("grant_type", password != null ? "password" : "client_credentials"), // Adjust for external login
-            new KeyValuePair<string, string>("username", username),
-            new KeyValuePair<string, string>("password", password ?? string.Empty),
-            new KeyValuePair<string, string>("client_id", "your-client-id"),
-            new KeyValuePair<string, string>("client_secret", "your-secret"),
-            new KeyValuePair<string, string>("scope", "api1 offline_access")
-        });
 
-        var response = await client.PostAsync(_configuration["IdentityServer:TokenEndpoint"], request);
-        if (!response.IsSuccessStatusCode)
+        // Validate configuration values
+        var tokenEndpoint = _configuration["IdentityServer:TokenEndpoint"]
+            ?? throw new InvalidOperationException("Token endpoint is not configured.");
+        var clientId = _configuration["IdentityServer:ClientId"]
+            ?? throw new InvalidOperationException("ClientId is not configured.");
+        var clientSecret = _configuration["IdentityServer:ClientSecret"]
+            ?? throw new InvalidOperationException("ClientSecret is not configured.");
+        var scope = _configuration["IdentityServer:Scope"]
+            ?? throw new InvalidOperationException("Scope is not configured.");
+
+        // Prepare request parameters
+        var parameters = new List<KeyValuePair<string, string>>
+    {
+        new KeyValuePair<string, string>("grant_type", password != null ? "password" : "client_credentials"),
+        new KeyValuePair<string, string>("client_id", clientId),
+        new KeyValuePair<string, string>("client_secret", clientSecret),
+        new KeyValuePair<string, string>("scope", scope)
+    };
+
+        if (password != null)
         {
-            throw new ResponseException("Failed to obtain token from IdentityServer");
+            parameters.Add(new KeyValuePair<string, string>("username", username));
+            parameters.Add(new KeyValuePair<string, string>("password", password));
         }
 
-        return await response.Content.ReadAsStringAsync(); // Returns JSON with access_token, refresh_token, etc.
-    }
+        var request = new FormUrlEncodedContent(parameters);
+        var response = await client.PostAsync(tokenEndpoint, request);
 
-    // Removed custom token helpers since IdentityServer handles them
+        Console.WriteLine($"Response Status: {response.StatusCode}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Error Content: {errorContent}");
+            throw new ResponseException($"Failed to obtain token from IdentityServer: {response.StatusCode} - {errorContent}");
+        }
+
+        var responseContent = await response.Content.ReadAsStringAsync();
+
+        // Parse JSON response to extract only the access token
+        using var document = JsonDocument.Parse(responseContent);
+        if (!document.RootElement.TryGetProperty("access_token", out var accessToken))
+        {
+            throw new ResponseException("Failed to obtain access token from IdentityServer response.");
+        }
+
+        return accessToken.GetString()!;
+    }
 }
