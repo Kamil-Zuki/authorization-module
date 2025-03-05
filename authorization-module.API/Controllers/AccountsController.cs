@@ -38,7 +38,7 @@ public class AccountsController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] UserLoginRequest request)
+    public async Task<ActionResult<TokenResultDto>> Login([FromBody] UserLoginRequest request)
     {
         var validationResult = await _userLoginValidator.ValidateAsync(request);
         if (!validationResult.IsValid)
@@ -48,13 +48,7 @@ public class AccountsController : ControllerBase
 
         var result = await _authService.LoginUserAsync(request);
         // Assuming result.Data is a JSON string from IdentityServer
-        var tokenData = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(result.Data);
-        return Ok(new
-        {
-            AccessToken = tokenData["access_token"],
-            RefreshToken = tokenData["refresh_token"],
-            ExpiresIn = tokenData["expires_in"]
-        });
+        return Ok(result);
     }
 
     [HttpGet("confirm-email")]
@@ -96,16 +90,11 @@ public class AccountsController : ControllerBase
     }
 
     [HttpGet("signin-external")]
-    public async Task<IActionResult> HandleExternalLoginCallback()
+    public async Task<ActionResult<TokenResultDto>> HandleExternalLoginCallback()
     {
         var result = await _authService.HandleExternalLoginCallbackAsync();
-        var tokenData = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(result.Data);
-        return Ok(new
-        {
-            AccessToken = tokenData["access_token"],
-            RefreshToken = tokenData["refresh_token"],
-            ExpiresIn = tokenData["expires_in"]
-        });
+
+        return Ok(result);
     }
 
     [HttpPost("refresh")]
