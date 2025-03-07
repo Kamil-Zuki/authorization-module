@@ -98,13 +98,13 @@ public class AccountsController : ControllerBase
     }
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+    public async Task<ActionResult<RefreshTokenDto>> RefreshToken([FromBody] RefreshTokenRequest request)
     {
         var result = await _authService.RefreshTokenAsync(request.RefreshToken);
-        return Ok(new
+        return Ok(new RefreshTokenDto()
         {
-            result.AccessToken,
-            result.RefreshToken
+            AccessToken = result.AccessToken,
+            RefreshToken = result.RefreshToken
         });
     }
 

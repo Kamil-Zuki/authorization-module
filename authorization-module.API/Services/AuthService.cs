@@ -234,14 +234,29 @@ public class AuthService : IAuthService
             var errorContent = await response.Content.ReadAsStringAsync();
             throw new ResponseException($"Failed to refresh token: {response.StatusCode} - {errorContent}");
         }
+        var responseContent = await response.Content.ReadAsStringAsync();
+        Console.WriteLine($"Refresh token raw response content: {responseContent}");
 
-        var json = await response.Content.ReadAsStringAsync();
-        var tokenData = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-        return new TokenResultDto
+        if (!response.IsSuccessStatusCode)
         {
-            AccessToken = tokenData["access_token"],
-            RefreshToken = tokenData["refresh_token"]
-        };
+            throw new ResponseException($"Failed to obtain token: {response.StatusCode} - {responseContent}");
+        }
+
+        try
+        {
+
+            Console.WriteLine(responseContent);
+            return JsonSerializer.Deserialize<TokenResultDto>(responseContent);
+        }
+        catch (JsonException ex)
+        {
+            throw new ResponseException($"Invalid JSON in token response: {ex.Message} - Response: {responseContent}");
+        }
+        //return new TokenResultDto
+        //{
+        //    AccessToken = tokenData["access_token"],
+        //    RefreshToken = tokenData["refresh_token"]
+        //};
     }
 
     public async Task<UserProfileDto> GetUserProfileAsync(string userId)
