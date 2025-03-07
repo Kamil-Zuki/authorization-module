@@ -1,4 +1,4 @@
-using authorization_module.API.Data;
+﻿using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
 using authorization_module.API.Interfaces;
@@ -17,22 +17,22 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 #if RELEASE
-builder.WebHost.UseUrls("http://*:80"); // Consider HTTPS in production
+builder.WebHost.UseUrls("http://*:80"); // Consider using HTTPS in production
 #endif
 
-// Add services
+// 🔹 Add services
 builder.Services.AddControllers();
 
-// Database
+// 🔹 Database Configuration
 builder.Services.AddDbContext<DataContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
 
-// Identity
+// 🔹 Identity Configuration
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<DataContext>()
     .AddDefaultTokenProviders();
 
-// CORS
+// 🔹 CORS Configuration
 builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
 {
     policy.AllowAnyHeader()
@@ -40,9 +40,19 @@ builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
           .AllowAnyOrigin();
 }));
 
-// IdentityServer
+// 🔹 Prevent Redirection to `/Account/Login` (Fix 404 Issue)
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Events.OnRedirectToLogin = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+});
+
+// 🔹 IdentityServer Configuration
 builder.Services.AddIdentityServer()
-    .AddAspNetIdentity<ApplicationUser>() // Integrate with Identity users
+    .AddAspNetIdentity<ApplicationUser>()
     .AddConfigurationStore(options =>
     {
         options.ConfigureDbContext = b => b.UseNpgsql(builder.Configuration.GetConnectionString("Db"));
@@ -50,21 +60,21 @@ builder.Services.AddIdentityServer()
     .AddOperationalStore(options =>
     {
         options.ConfigureDbContext = b => b.UseNpgsql(builder.Configuration.GetConnectionString("Db"));
-        options.EnableTokenCleanup = true; // Clean expired tokens
-        options.TokenCleanupInterval = 3600; // Hourly cleanup
+        options.EnableTokenCleanup = true; // Cleanup expired tokens
+        options.TokenCleanupInterval = 3600; // Run cleanup every hour
     })
-    .AddInMemoryClients(new[]
+    .AddInMemoryClients(new[] // Define OAuth Clients
     {
         new Client
         {
             ClientId = "auth-microservice",
-            ClientSecrets = { new Secret("your-secret".Sha256()) },
-            AllowedGrantTypes = GrantTypes.ResourceOwnerPassword, // For username/password login
-            AllowedScopes = { "api1", "offline_access" }, // API access + refresh tokens
-            AllowOfflineAccess = true, // Enable refresh tokens
-            RefreshTokenUsage = TokenUsage.OneTimeOnly, // New refresh token each time
+            ClientSecrets = { new Secret(builder.Configuration["IdentityServer:ClientSecret"]?.Sha256() ?? "default_secret".Sha256()) },
+            AllowedGrantTypes = GrantTypes.ResourceOwnerPassword, // Password authentication
+            AllowedScopes = { "api1", "offline_access" }, // API Access & Refresh tokens
+            AllowOfflineAccess = true, // Enable Refresh tokens
+            RefreshTokenUsage = TokenUsage.OneTimeOnly,
             RefreshTokenExpiration = TokenExpiration.Sliding,
-            SlidingRefreshTokenLifetime = 604800 // 7 days
+            SlidingRefreshTokenLifetime = 604800 // 7 days (1 week)
         }
     })
     .AddInMemoryApiScopes(new[]
@@ -72,9 +82,49 @@ builder.Services.AddIdentityServer()
         new ApiScope("api1", "API Access"),
         new ApiScope("offline_access", "Offline Access")
     })
-    .AddDeveloperSigningCredential(); // Use a real cert in production
+    .AddDeveloperSigningCredential(); // Replace with a production certificate
 
-// Swagger
+// 🔹 JWT Authentication Configuration
+var jwtSecret = builder.Configuration["Jwt:Secret"];
+if (string.IsNullOrEmpty(jwtSecret))
+{
+    throw new InvalidOperationException("JWT Secret is missing in configuration.");
+}
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.Authority = builder.Configuration["IdentityServer:Authority"];
+    options.Audience = builder.Configuration["Jwt:Audience"];
+    options.RequireHttpsMetadata = false;
+
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+    };
+});
+
+// 🔹 Authorization
+builder.Services.AddAuthorization();
+
+// 🔹 Additional Services
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IValidator<UserRegistrationRequest>, UserRegistrationValidator>();
+builder.Services.AddScoped<IValidator<UserLoginRequest>, UserLoginValidator>();
+
+// 🔹 Swagger Configuration
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "Auth API", Version = "v1" });
@@ -85,7 +135,7 @@ builder.Services.AddSwaggerGen(options =>
         {
             Password = new OpenApiOAuthFlow
             {
-                TokenUrl = new Uri(builder.Configuration["IdentityServer:TokenEndpoint"]),
+                TokenUrl = new Uri(builder.Configuration["IdentityServer:TokenEndpoint"] ?? "http://localhost:5027/connect/token"),
                 Scopes = new Dictionary<string, string>
                 {
                     { "api1", "API Access" },
@@ -97,36 +147,16 @@ builder.Services.AddSwaggerGen(options =>
     options.OperationFilter<SecurityRequirementsOperationFilter>();
 });
 
-// Authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.Authority = builder.Configuration["IdentityServer:Authority"];
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateAudience = false // Adjust based on your needs
-        };
-    });
-
-// Authorization
-builder.Services.AddAuthorization();
-
-// Additional services
-builder.Services.AddHttpClient(); // For AuthService token endpoint calls
-builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IValidator<UserRegistrationRequest>, UserRegistrationValidator>();
-builder.Services.AddScoped<IValidator<UserLoginRequest>, UserLoginValidator>();
-
 var app = builder.Build();
 
-// Middleware pipeline
+// 🔹 Middleware Pipeline
 app.UseCors("cors");
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseHttpsRedirection(); // Remove if using HTTP only in RELEASE
+// app.UseHttpsRedirection(); // Uncomment if using HTTPS
 app.UseIdentityServer();
+
+// 🔹 Swagger Middleware
 app.UseSwagger(c =>
 {
     c.RouteTemplate = "authorization-module/swagger/{documentname}/swagger.json";
@@ -136,10 +166,22 @@ app.UseSwaggerUI(c =>
     c.SwaggerEndpoint("/authorization-module/swagger/v1/swagger.json", "Authorization API");
     c.RoutePrefix = "authorization-module/swagger";
     c.OAuthClientId("auth-microservice");
-    c.OAuthClientSecret("your-secret");
+    c.OAuthClientSecret(builder.Configuration["IdentityServer:ClientSecret"]);
     c.OAuthUsePkce();
 });
+
+// 🔹 Map Controllers
 app.MapControllers();
-// app.UseMiddleware<ExceptionHandlingMiddleware>(); // Uncomment if defined
+
+// 🔹 Exception Handling Middleware (Optional)
+// app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+app.Use(async (context, next) =>
+{
+    Console.WriteLine($"Request: {context.Request.Method} {context.Request.Path}");
+    await next.Invoke();
+});
+
+
 
 app.Run();

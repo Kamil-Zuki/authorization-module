@@ -47,7 +47,6 @@ public class AccountsController : ControllerBase
         }
 
         var result = await _authService.LoginUserAsync(request);
-        // Assuming result.Data is a JSON string from IdentityServer
         return Ok(result);
     }
 
@@ -74,7 +73,7 @@ public class AccountsController : ControllerBase
         return Ok(new { Message = result.Data });
     }
 
-    [Authorize] // Requires JWT authentication
+    [Authorize]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
@@ -110,7 +109,7 @@ public class AccountsController : ControllerBase
 
     [Authorize]
     [HttpGet("profile")]
-    public async Task<IActionResult> GetUserProfile()
+    public async Task<ActionResult<UserProfileDto>> GetUserProfile()
     {
         var userId = User.FindFirst("sub")?.Value;
         if (string.IsNullOrEmpty(userId))
@@ -119,11 +118,7 @@ public class AccountsController : ControllerBase
         }
 
         var result = await _authService.GetUserProfileAsync(userId);
-        return Ok(new
-        {
-            result.Email,
-            result.Username
-        });
+        return Ok(result);
     }
 
     [Authorize]
