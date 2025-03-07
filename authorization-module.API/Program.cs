@@ -9,9 +9,11 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
+using System.Security.Cryptography;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -84,34 +86,40 @@ builder.Services.AddIdentityServer()
     })
     .AddDeveloperSigningCredential(); // Replace with a production certificate
 
-// 🔹 JWT Authentication Configuration
-var jwtSecret = builder.Configuration["Jwt:Secret"];
-if (string.IsNullOrEmpty(jwtSecret))
+// 🔹 JWT Authentication Configuration (RS256)
+var publicKey = builder.Configuration["Jwt:PublicKey"];
+if (string.IsNullOrEmpty(publicKey))
 {
-    throw new InvalidOperationException("JWT Secret is missing in configuration.");
+    throw new InvalidOperationException("Public Key is missing in configuration.");
 }
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.Authority = builder.Configuration["IdentityServer:Authority"];
-    options.Audience = builder.Configuration["Jwt:Audience"];
-    options.RequireHttpsMetadata = false;
+// Ensure the public key is in PEM format (it must start with -----BEGIN PUBLIC KEY----- and end with -----END PUBLIC KEY-----)
+string pemFormattedKey = "-----BEGIN PUBLIC KEY-----\n" + publicKey + "\n-----END PUBLIC KEY-----";
 
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
-    };
-});
+// Convert the public key into a byte array (Base64 decoded)
+byte[] publicKeyBytes = Convert.FromBase64String(pemFormattedKey.Replace("-----BEGIN PUBLIC KEY-----", "").Replace("-----END PUBLIC KEY-----", "").Replace("\n", ""));
+
+// Create an RSA instance and load the public key
+using (RSA rsa = RSA.Create())
+{
+    rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out _);
+
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.Authority = "http://localhost:5027";
+            options.Audience = "api1"; // Ensure this matches the token's audience claim
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidIssuer = "http://localhost:5027", // Same as token issuer
+                ValidAudience = "api1", // Same as token audience
+                IssuerSigningKey = new RsaSecurityKey(rsa), // Use the public key for RS256 verification
+                ClockSkew = TimeSpan.Zero // Optional: Reduce the allowed clock skew if necessary
+            };
+        });
+}
 
 // 🔹 Authorization
 builder.Services.AddAuthorization();
@@ -181,7 +189,5 @@ app.Use(async (context, next) =>
     Console.WriteLine($"Request: {context.Request.Method} {context.Request.Path}");
     await next.Invoke();
 });
-
-
 
 app.Run();
