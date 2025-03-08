@@ -77,23 +77,25 @@ public class AuthService : IAuthService
 
     public async Task<TokenResultDto> LoginUserAsync(UserLoginRequest model)
     {
+        // Find user by email
         var user = await _userManager.FindByEmailAsync(model.Email)
-            ?? throw new ResponseException("User not found");
+            ?? throw new ResponseException("Invalid login attempt"); // Don't reveal if email exists
 
-        var result = await _signInManager.PasswordSignInAsync(
-            user.UserName!, model.Password, false, lockoutOnFailure: false);
-
-        if (!result.Succeeded)
-        {
-            throw new ResponseException("Invalid login attempt");
-        }
-
+        // Check if email is confirmed
         if (!user.EmailConfirmed)
         {
-            throw new ResponseException("Email not confirmed");
+            throw new ResponseException("Invalid login attempt"); // Avoid revealing email confirmation status
         }
 
-        return await GetTokenFromIdentityServerAsync(user.UserName!, model.Password);
+        // Validate password
+        var isPasswordValid = await _userManager.CheckPasswordAsync(user, model.Password);
+        if (!isPasswordValid)
+        {
+            throw new ResponseException("Invalid login attempt"); // Avoid exposing password-related info
+        }
+
+        // Generate token using IdentityServer, passing the plain-text password
+        return await GetTokenFromIdentityServerAsync(user.UserName, model.Password);
     }
 
     public async Task<StringResultDto> ConfirmEmailAsync(ConfirmEmailRequest request)
@@ -341,12 +343,12 @@ public class AuthService : IAuthService
             ?? throw new InvalidOperationException("Scope is not configured.");
 
         var parameters = new List<KeyValuePair<string, string>>
-        {
+            {
             new("grant_type", password != null ? "password" : "client_credentials"),
             new("client_id", clientId),
             new("client_secret", clientSecret),
             new("scope", scope)
-        };
+            };
 
         if (password != null)
         {
