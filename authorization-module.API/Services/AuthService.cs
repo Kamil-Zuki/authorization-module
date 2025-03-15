@@ -3,6 +3,8 @@ using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
 using authorization_module.API.Interfaces;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace authorization_module.API.Services;
 
@@ -64,13 +66,12 @@ public class AuthService(UserManager<ApplicationUser> userManager,
         return new StringResultDto("Confirm your email");
     }
 
-    public async Task<StringResultDto> LoginUserAsync(UserLoginRequest model)
+    public async Task<TokenDto> LoginUserAsync(UserLoginRequest model)
     {
         var user = await _userManager.FindByEmailAsync(model.Email)
             ?? throw new ResponseException("User not found");
 
-        var result = await _signInManager.PasswordSignInAsync(
-            user.UserName!, model.Password, false, lockoutOnFailure: false);
+        var result = await _signInManager.PasswordSignInAsync(user.UserName!, model.Password, false, lockoutOnFailure: false);
 
         if (!result.Succeeded)
         {
@@ -82,10 +83,69 @@ public class AuthService(UserManager<ApplicationUser> userManager,
             throw new ResponseException("Email not confirmed");
         }
 
-        var token = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
+        var accessToken = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
+        var refreshToken = _tokenService.GenerateRefreshToken();
 
-        return new StringResultDto(token);
+        // Save refresh token to database
+        var refreshTokenEntity = new RefreshToken
+        {
+            Token = refreshToken,
+            UserId = user.Id,
+            ExpiryDate = DateTime.UtcNow.AddDays(7),
+            IsRevoked = false
+        };
+
+        _dbContext.RefreshTokens.Add(refreshTokenEntity);
+        await _dbContext.SaveChangesAsync();
+
+        return new TokenDto
+        {
+            AccessToken = accessToken,
+            RefreshToken = refreshToken
+        };
     }
+
+    public async Task<TokenDto> RefreshToken(RefreshTokenRequest request)
+    {
+        var storedToken = await _dbContext.RefreshTokens
+            .FirstOrDefaultAsync(t => t.Token == request.RefreshToken);
+
+        if (storedToken == null || storedToken.IsRevoked || storedToken.ExpiryDate < DateTime.UtcNow)
+        {
+            throw new ResponseException("Invalid or expired refresh token" );
+        }
+
+        var user = await _userManager.FindByIdAsync(storedToken.UserId);
+        if (user == null)
+        {
+            throw new ResponseException("User not found");
+        }
+
+        var newAccessToken = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
+        var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+        // Invalidate old refresh token
+        storedToken.IsRevoked = true;
+
+        // Store new refresh token
+        var newRefreshTokenEntity = new RefreshToken
+        {
+            Token = newRefreshToken,
+            UserId = user.Id,
+            ExpiryDate = DateTime.UtcNow.AddDays(7),
+            IsRevoked = false
+        };
+
+        _dbContext.RefreshTokens.Add(newRefreshTokenEntity);
+        await _dbContext.SaveChangesAsync();
+
+        return new TokenDto
+        {
+            AccessToken = newAccessToken,
+            RefreshToken = newRefreshToken
+        };
+    }
+
 
     public async Task<StringResultDto> ConfirmEmailAsync(ConfirmEmailRequest request)
     {

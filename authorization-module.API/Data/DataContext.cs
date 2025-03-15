@@ -7,6 +7,7 @@ namespace authorization_module.API.Data;
 public sealed class DataContext : IdentityDbContext<ApplicationUser>
 {
     public DbSet<ApplicationUser> ApplicationUsers { get; set; } = null!;
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
     public DataContext(DbContextOptions<DataContext> options)
         : base(options)

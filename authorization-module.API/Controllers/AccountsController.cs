@@ -49,6 +49,13 @@ namespace authorization_module.API.Controllers
             return Ok(result);
         }
 
+        [HttpPost("refresh-token")]
+        public async Task<ActionResult<TokenDto>> RefreshToken([FromBody] RefreshTokenRequest request)
+        {
+            var result = await _authService.RefreshToken(request);
+            return Ok(result);
+        }
+
         [HttpGet("confirm-email")]
         public async Task<ActionResult<StringResultDto>> ConfirmEmail([FromQuery] ConfirmEmailRequest request)
         {
