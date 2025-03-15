@@ -5,18 +5,14 @@ using authorization_module.API.Exceptions;
 using authorization_module.API.Interfaces;
 using authorization_module.API.Services;
 using authorization_module.API.Validations;
-using Duende.IdentityServer.Models;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
-
-using Secret = Duende.IdentityServer.Models.Secret;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,32 +36,6 @@ builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
           .AllowAnyOrigin();
 }));
 
-builder.Services.AddIdentityServer()
-    .AddInMemoryClients(
-    [
-        new Client
-        {
-            ClientId = "serviceA",
-            AllowedGrantTypes = GrantTypes.ClientCredentials,
-            ClientSecrets = { new Secret("serviceA-secret".Sha256()) },
-            AllowedScopes = { "serviceA.read", "serviceA.write" }
-        },
-        new Client
-        {
-            ClientId = "serviceB",
-            AllowedGrantTypes = GrantTypes.ClientCredentials,
-            ClientSecrets = { new Secret("serviceB-secret".Sha256()) },
-            AllowedScopes = { "serviceB.read", "serviceB.write" }
-        }
-    ])
-    .AddInMemoryApiScopes(
-    [
-        new ApiScope("serviceA.read", "Read access to Service A"),
-        new ApiScope("serviceA.write", "Write access to Service A"),
-        new ApiScope("serviceB.read", "Read access to Service B"),
-        new ApiScope("serviceB.write", "Write access to Service B")
-    ])
-    .AddDeveloperSigningCredential();
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -120,7 +90,7 @@ app.UseAuthorization();
 
 app.UseHttpsRedirection();
 
-app.UseIdentityServer();
+
 
 app.UseSwagger(c =>
 {
