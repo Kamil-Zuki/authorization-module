@@ -1,7 +1,10 @@
 using authorization_module.API.Dtos;
 using authorization_module.API.Interfaces;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace authorization_module.API.Controllers
 {
@@ -62,5 +65,17 @@ namespace authorization_module.API.Controllers
             var result = await _authService.ConfirmEmailAsync(request);
             return Ok(result);
         }
+
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetUserInfo()
+        {
+            var userId = GetUserIdFromToken();
+
+            var userInfo = await _authService.GetUserInfoAsync(userId);
+            return Ok(userInfo);
+        }
+
+        private string GetUserIdFromToken() => User.FindFirst(ClaimTypes.NameIdentifier).Value ?? throw new UnauthorizedAccessException();
     }
 }

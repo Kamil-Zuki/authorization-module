@@ -1,7 +1,6 @@
 using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
-using authorization_module.API.Exceptions;
 using authorization_module.API.Interfaces;
 using authorization_module.API.Services;
 using authorization_module.API.Validations;
@@ -25,6 +24,7 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<DataContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
 
+
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
         .AddEntityFrameworkStores<DataContext>()
         .AddDefaultTokenProviders();
@@ -37,16 +37,24 @@ builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
 }));
 
 
+
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+//validation
+builder.Services.AddScoped<IValidator<UserRegistrationRequest>, UserRegistrationValidator>();
+builder.Services.AddScoped<IValidator<UserLoginRequest>, UserLoginValidator>();
+
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Auth API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Personal Vocabulary API", Version = "v1" });
     options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
         Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = JwtBearerDefaults.AuthenticationScheme,
-        BearerFormat = "JWT"
+        Type = SecuritySchemeType.ApiKey
     });
     options.OperationFilter<SecurityRequirementsOperationFilter>();
 });
@@ -70,15 +78,8 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+
 builder.Services.AddAuthorization();
-
-builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
-
-//validation
-builder.Services.AddScoped<IValidator<UserRegistrationRequest>, UserRegistrationValidator>();
-builder.Services.AddScoped<IValidator<UserLoginRequest>, UserLoginValidator>();
 
 var app = builder.Build();
 
@@ -88,7 +89,7 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 
 
@@ -103,7 +104,12 @@ app.UseSwaggerUI(c =>
 });
 
 app.MapControllers();
-
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.Use(async (context, next) =>
+{
+    var authHeader = context.Request.Headers["Authorization"].ToString();
+    app.Logger.LogInformation("Raw Authorization Header: '{Header}'", authHeader);
+    await next(context);
+});
+//app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.Run();

@@ -15,33 +15,24 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="AspNet.Security.OAuth.Vkontakte" Version="8.2.0" />
       <PackageReference Include="FluentEmail.Smtp" Version="3.0.2" />
       <PackageReference Include="FluentValidation" Version="11.11.0" />
       <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
-      <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
+      <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
       <PackageReference Include="Google.Apis.Gmail.v1" Version="1.68.0.3427" />
-      <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
-      <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.10" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
-        <PrivateAssets>all</PrivateAssets>
-        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10">
-        <PrivateAssets>all</PrivateAssets>
-        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      </PackageReference>
-      <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.1.2" />
-      <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
-      <PackageReference Include="MimeKit" Version="4.8.0" />
-      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
-      <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+      <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
+      <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.3" />
+      <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.6.1" />
+      <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.2" />
+      <PackageReference Include="MimeKit" Version="4.11.0" />
+      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.2" />
+      <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
       <PackageReference Include="SendGrid" Version="9.29.3" />
       <PackageReference Include="Swashbuckle.AspNetCore.Filters" Version="8.0.2" />
-      <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.9.0" />
-      <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.9.0" />
-      <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.9.0" />
+      <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="8.0.0" />
+      <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="8.0.0" />
+      <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="8.0.0" />
+      <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.6.1" />
     </ItemGroup>
 
     <ItemGroup>

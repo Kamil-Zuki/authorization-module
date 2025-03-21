@@ -8,5 +8,6 @@ namespace authorization_module.API.Interfaces
         Task<TokenDto> LoginUserAsync(UserLoginRequest request);
         Task<TokenDto> RefreshToken(RefreshTokenRequest request);
         Task<StringResultDto> ConfirmEmailAsync(ConfirmEmailRequest request);
+        Task<UserInfoDto> GetUserInfoAsync(string userId);
     }
 }

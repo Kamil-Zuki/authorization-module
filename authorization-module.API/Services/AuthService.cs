@@ -171,4 +171,18 @@ public class AuthService(UserManager<ApplicationUser> userManager,
 
         return new StringResultDto("Confirmation completed successfully");
     }
+
+    public async Task<UserInfoDto> GetUserInfoAsync(string userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId)
+            ?? throw new ResponseException("User not found");
+
+        return new UserInfoDto
+        {
+            Id = user.Id,
+            UserName = user.UserName ?? string.Empty,
+            Email = user.Email ?? string.Empty,
+            EmailConfirmed = user.EmailConfirmed
+        };
+    }
 }
