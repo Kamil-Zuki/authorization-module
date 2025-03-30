@@ -77,19 +77,19 @@ namespace authorization_module.API.Controllers
 
         [Authorize]
         [HttpPost("logout")]
-        public async Task<IActionResult> Logout([FromBody] string refreshToken)
+        public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
         {
             var userId = GetUserIdFromToken();
-            var result = await _authService.LogoutUserAsync(userId, refreshToken);
+            var result = await _authService.LogoutUserAsync(userId, request.RefreshToken);
             return Ok(new { Message = result.Data });
         }
 
         [Authorize]
         [HttpPut("username")]
-        public async Task<IActionResult> UpdateUsername([FromBody] string newUserName)
+        public async Task<IActionResult> UpdateUsername([FromBody] UpdateUsernameRequest request)
         {
             var userId = GetUserIdFromToken();
-            var result = await _authService.UpdateUserNameAsync(userId, newUserName);
+            var result = await _authService.UpdateUserNameAsync(userId, request.UserName);
             return Ok(new { Message = result.Data });
         }
 
