@@ -86,7 +86,9 @@ public class AuthService(UserManager<ApplicationUser> userManager,
         var accessToken = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
         var refreshToken = _tokenService.GenerateRefreshToken();
 
-        // Save refresh token to database
+        await _dbContext.RefreshTokens.Where(x => x.UserId == user.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsRevoked, true));
+
         var refreshTokenEntity = new RefreshToken
         {
             Token = refreshToken,
@@ -115,11 +117,8 @@ public class AuthService(UserManager<ApplicationUser> userManager,
             throw new ResponseException("Invalid or expired refresh token" );
         }
 
-        var user = await _userManager.FindByIdAsync(storedToken.UserId);
-        if (user == null)
-        {
-            throw new ResponseException("User not found");
-        }
+        var user = await _userManager.FindByIdAsync(storedToken.UserId)
+            ?? throw new ResponseException("User not found");
 
         var newAccessToken = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
         var newRefreshToken = _tokenService.GenerateRefreshToken();
