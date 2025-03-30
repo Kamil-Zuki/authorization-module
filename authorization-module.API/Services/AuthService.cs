@@ -86,9 +86,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
         var accessToken = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
         var refreshToken = _tokenService.GenerateRefreshToken();
 
-        await _dbContext.RefreshTokens.Where(x => x.UserId == user.Id)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsRevoked, true));
-
+        // Add the new refresh token without revoking existing ones
         var refreshTokenEntity = new RefreshToken
         {
             Token = refreshToken,
@@ -114,7 +112,7 @@ public class AuthService(UserManager<ApplicationUser> userManager,
 
         if (storedToken == null || storedToken.IsRevoked || storedToken.ExpiryDate < DateTime.UtcNow)
         {
-            throw new ResponseException("Invalid or expired refresh token" );
+            throw new ResponseException("Invalid or expired refresh token");
         }
 
         var user = await _userManager.FindByIdAsync(storedToken.UserId)
@@ -184,4 +182,80 @@ public class AuthService(UserManager<ApplicationUser> userManager,
             EmailConfirmed = user.EmailConfirmed
         };
     }
+
+    public async Task<StringResultDto> LogoutUserAsync(string userId, string refreshToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId)
+            ?? throw new ResponseException("User not found");
+
+        await _signInManager.SignOutAsync();
+
+        if (!string.IsNullOrEmpty(refreshToken))
+        {
+            var storedToken = await _dbContext.RefreshTokens
+                .FirstOrDefaultAsync(t => t.Token == refreshToken && t.UserId == userId);
+
+            if (storedToken != null && !storedToken.IsRevoked)
+            {
+                storedToken.IsRevoked = true;
+                await _dbContext.SaveChangesAsync();
+            }
+        }
+
+        return new StringResultDto("Logout successful");
+    }
+
+    public async Task<StringResultDto> UpdateUserNameAsync(string userId, string newUserName)
+    {
+        if (string.IsNullOrWhiteSpace(newUserName))
+            throw new ResponseException("Username cannot be empty");
+
+        var user = await _userManager.FindByIdAsync(userId)
+            ?? throw new ResponseException("User not found");
+
+        var existingUser = await _userManager.FindByNameAsync(newUserName);
+        if (existingUser != null && existingUser.Id != userId)
+            throw new ResponseException("Username is already taken");
+
+        user.UserName = newUserName;
+        var result = await _userManager.UpdateAsync(user);
+
+        if (!result.Succeeded)
+        {
+            throw new ResponseException(
+                result.Errors.Select(e => new ErrorResponseMessage
+                {
+                    StatusCode = 400,
+                    ErrorMessage = e.Description
+                }).ToList()
+            );
+        }
+
+        return new StringResultDto("Username updated successfully");
+    }
+
+    public async Task<StringResultDto> UpdateUserPasswordAsync(string userId, string currentPassword, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword))
+            throw new ResponseException("New password cannot be empty");
+
+        var user = await _userManager.FindByIdAsync(userId)
+            ?? throw new ResponseException("User not found");
+
+        var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+
+        if (!result.Succeeded)
+        {
+            throw new ResponseException(
+                result.Errors.Select(e => new ErrorResponseMessage
+                {
+                    StatusCode = 400,
+                    ErrorMessage = e.Description
+                }).ToList()
+            );
+        }
+
+        return new StringResultDto("Password updated successfully");
+    }
 }
+

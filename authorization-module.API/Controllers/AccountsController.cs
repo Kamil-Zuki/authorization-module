@@ -76,6 +76,33 @@ namespace authorization_module.API.Controllers
             return Ok(userInfo);
         }
 
+        [Authorize]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout([FromBody] string refreshToken)
+        {
+            var userId = GetUserIdFromToken();
+            var result = await _authService.LogoutUserAsync(userId, refreshToken);
+            return Ok(new { Message = result.Data });
+        }
+
+        [Authorize]
+        [HttpPut("update-username")]
+        public async Task<IActionResult> UpdateUsername([FromBody] string newUserName)
+        {
+            var userId = GetUserIdFromToken();
+            var result = await _authService.UpdateUserNameAsync(userId, newUserName);
+            return Ok(new { Message = result.Data });
+        }
+
+        [Authorize]
+        [HttpPut("update-password")]
+        public async Task<IActionResult> UpdatePassword([FromBody] UpdatePasswordRequest request)
+        {
+            var userId = GetUserIdFromToken();
+            var result = await _authService.UpdateUserPasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+            return Ok(new { Message = result.Data });
+        }
+
         private string GetUserIdFromToken() => User.FindFirst(ClaimTypes.NameIdentifier).Value ?? throw new UnauthorizedAccessException();
     }
 }

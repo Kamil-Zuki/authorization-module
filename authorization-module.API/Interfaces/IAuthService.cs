@@ -9,5 +9,9 @@ namespace authorization_module.API.Interfaces
         Task<TokenDto> RefreshToken(RefreshTokenRequest request);
         Task<StringResultDto> ConfirmEmailAsync(ConfirmEmailRequest request);
         Task<UserInfoDto> GetUserInfoAsync(string userId);
+        Task<StringResultDto> LogoutUserAsync(string userId, string refreshToken);
+        Task<StringResultDto> UpdateUserNameAsync(string userId, string newUserName);
+        Task<StringResultDto> UpdateUserPasswordAsync(string userId, string currentPassword, string newPassword);
     }
 }
+    
