@@ -3,7 +3,6 @@ using authorization_module.API.Interfaces;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace authorization_module.API.Controllers
@@ -86,7 +85,7 @@ namespace authorization_module.API.Controllers
         }
 
         [Authorize]
-        [HttpPut("update-username")]
+        [HttpPut("username")]
         public async Task<IActionResult> UpdateUsername([FromBody] string newUserName)
         {
             var userId = GetUserIdFromToken();
@@ -95,7 +94,7 @@ namespace authorization_module.API.Controllers
         }
 
         [Authorize]
-        [HttpPut("update-password")]
+        [HttpPut("password")]
         public async Task<IActionResult> UpdatePassword([FromBody] UpdatePasswordRequest request)
         {
             var userId = GetUserIdFromToken();
