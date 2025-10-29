@@ -78,10 +78,10 @@ public class AuthService(UserManager<ApplicationUser> userManager,
             throw new ResponseException("Invalid login attempt");
         }
 
-        if (!user.EmailConfirmed)
-        {
-            throw new ResponseException("Email not confirmed");
-        }
+        //if (!user.EmailConfirmed)
+        //{
+        //    throw new ResponseException("Email not confirmed");
+        //}
 
         var accessToken = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
         var refreshToken = _tokenService.GenerateRefreshToken();

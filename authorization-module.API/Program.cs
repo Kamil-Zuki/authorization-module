@@ -1,6 +1,7 @@
 using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
+using authorization_module.API.Exceptions;
 using authorization_module.API.Interfaces;
 using authorization_module.API.Services;
 using authorization_module.API.Validations;
@@ -83,6 +84,8 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 app.UseCors("cors");
 
 app.UseAuthentication();
@@ -103,13 +106,13 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "authorization-module/swagger";
 });
 
-app.MapControllers();
 app.Use(async (context, next) =>
 {
     var authHeader = context.Request.Headers["Authorization"].ToString();
     app.Logger.LogInformation("Raw Authorization Header: '{Header}'", authHeader);
     await next(context);
 });
-//app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+app.MapControllers();
 
 app.Run();
