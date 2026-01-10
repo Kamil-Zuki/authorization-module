@@ -1,3 +1,4 @@
+using authorization_module.API.Api.Grpc;
 using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
@@ -40,7 +41,7 @@ builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
 
 
 builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAuthService, authorization_module.API.Services.AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
 //validation
@@ -82,6 +83,14 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+// Add gRPC services
+builder.Services.AddGrpc(options =>
+{
+    options.MaxSendMessageSize = 1000 * 1024 * 1024; // 1 GB
+    options.MaxReceiveMessageSize = 1000 * 1024 * 1024; // 1 GB
+    options.EnableDetailedErrors = true;
+});
+
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -112,6 +121,9 @@ app.Use(async (context, next) =>
     app.Logger.LogInformation("Raw Authorization Header: '{Header}'", authHeader);
     await next(context);
 });
+
+// Map gRPC services
+app.MapGrpcService<authorization_module.API.Api.Grpc.AuthService>();
 
 app.MapControllers();
 

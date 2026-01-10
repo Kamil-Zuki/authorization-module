@@ -1,6 +1,7 @@
 ﻿using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
+using authorization_module.API.Exceptions;
 using authorization_module.API.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;

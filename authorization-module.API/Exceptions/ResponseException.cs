@@ -1,5 +1,7 @@
 ﻿using authorization_module.API.Dtos;
 
+namespace authorization_module.API.Exceptions;
+
 public class ResponseException : Exception
 {
     public List<ErrorResponseMessage> Errors { get; }

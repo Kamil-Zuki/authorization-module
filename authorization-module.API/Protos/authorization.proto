@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package pvs.auth.v1;
+
+
+option csharp_namespace = "Pvs.Auth.Grpc";
+
+// ============================================================================
+// Service Definition
+// ============================================================================
+
+service AuthService {
+  // Регистрация нового пользователя
+  rpc RegisterUser (RegisterUserRequest) returns (RegisterUserResponse);
+
+  // Вход пользователя
+  rpc LoginUser (LoginUserRequest) returns (TokenResponse);
+
+  // Обновление токена
+  rpc RefreshToken (RefreshTokenRequest) returns (TokenResponse);
+
+  // Подтверждение email
+  rpc ConfirmEmail (ConfirmEmailRequest) returns (MessageResponse);
+
+  // Получение информации о текущем пользователе
+  rpc GetUserInfo (GetUserInfoRequest) returns (UserInfoResponse);
+
+  // Выход пользователя
+  rpc LogoutUser (LogoutUserRequest) returns (MessageResponse);
+
+  // Обновление имени пользователя
+  rpc UpdateUsername (UpdateUsernameRequest) returns (MessageResponse);
+
+  // Обновление пароля пользователя
+  rpc UpdatePassword (UpdatePasswordRequest) returns (MessageResponse);
+}
+
+// ============================================================================
+// Messages
+// ============================================================================
+
+// Регистрация пользователя
+message RegisterUserRequest {
+  string email = 1;
+  string password = 2;
+  string confirm_password = 3;
+}
+
+message RegisterUserResponse {
+  string message = 1;
+}
+
+// Вход пользователя
+message LoginUserRequest {
+  string email = 1;
+  string password = 2;
+}
+
+// Токены
+message TokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+// Обновление токена
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// Подтверждение email
+message ConfirmEmailRequest {
+  string user_id = 1; // UUID
+  string token = 2;
+}
+
+// Информация о пользователе
+message GetUserInfoRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+}
+
+message UserInfoResponse {
+  string id = 1; // UUID
+  string user_name = 2;
+  string email = 3;
+  bool email_confirmed = 4;
+}
+
+// Выход пользователя
+message LogoutUserRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+  string refresh_token = 2;
+}
+
+// Обновление имени пользователя
+message UpdateUsernameRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+  string user_name = 2;
+}
+
+// Обновление пароля пользователя
+message UpdatePasswordRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+  string current_password = 2;
+  string new_password = 3;
+}
+
+// Общий ответ с сообщением
+message MessageResponse {
+  string message = 1;
+}
+

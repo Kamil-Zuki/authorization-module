@@ -33,6 +33,17 @@
       <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="8.0.0" />
       <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="8.0.0" />
       <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.6.1" />
+      <PackageReference Include="Grpc.AspNetCore.Server" Version="2.76.0" />
+      <PackageReference Include="Grpc.Tools" Version="2.76.0">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+      <PackageReference Include="Google.Protobuf" Version="3.33.2" />
+      <PackageReference Include="Riok.Mapperly" Version="4.3.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Protobuf Include="Protos\authorization.proto" GrpcServices="Server" />
     </ItemGroup>
 
     <ItemGroup>
