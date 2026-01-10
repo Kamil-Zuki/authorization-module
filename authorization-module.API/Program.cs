@@ -14,9 +14,12 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// В режиме RELEASE используем UseUrls
+// В режиме разработки используем ListenLocalhost из ConfigureKestrel
 #if RELEASE
 builder.WebHost.UseUrls("http://*:80");
 #endif
@@ -83,7 +86,15 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// Add gRPC services
+// Настройка Kestrel для поддержки HTTP/2 без TLS (для локальной разработки)
+// Используем такой же подход, как в рабочем проекте knowledge-service
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Используем IPAddress.Loopback (127.0.0.1) вместо ListenLocalhost
+    // Протоколы берутся из appsettings.json (Kestrel:EndpointDefaults:Protocols)
+    options.Listen(System.Net.IPAddress.Loopback, 5027);
+});
+
 builder.Services.AddGrpc(options =>
 {
     options.MaxSendMessageSize = 1000 * 1024 * 1024; // 1 GB
