@@ -1,9 +1,9 @@
-using authorization_module.API.Api.Grpc;
 using authorization_module.API.Data;
 using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
 using authorization_module.API.Exceptions;
 using authorization_module.API.Interfaces;
+using authorization_module.API.Mappers.AutoMapperProfiles;
 using authorization_module.API.Services;
 using authorization_module.API.Validations;
 using FluentValidation;
@@ -14,7 +14,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
+
+using authorization_module;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,9 +45,13 @@ builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
 
 
 builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IAuthService, authorization_module.API.Services.AuthService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
+
+// Регистрация AutoMapper
+var assembly = typeof(AuthMappingProfile).Assembly;
+builder.Services.AddAutoMapper(assembly);
 //validation
 builder.Services.AddScoped<IValidator<UserRegistrationRequest>, UserRegistrationValidator>();
 builder.Services.AddScoped<IValidator<UserLoginRequest>, UserLoginValidator>();

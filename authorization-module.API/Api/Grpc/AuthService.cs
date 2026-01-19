@@ -1,7 +1,7 @@
+using AutoMapper;
 using authorization_module.API.Dtos;
 using authorization_module.API.Helpers;
 using authorization_module.API.Interfaces;
-using authorization_module.API.Mappers;
 using FluentValidation;
 using Grpc.Core;
 using Pvs.Auth.Grpc;
@@ -10,6 +10,8 @@ using GrpcRefreshTokenRequest = Pvs.Auth.Grpc.RefreshTokenRequest;
 using GrpcConfirmEmailRequest = Pvs.Auth.Grpc.ConfirmEmailRequest;
 using GrpcUpdateUsernameRequest = Pvs.Auth.Grpc.UpdateUsernameRequest;
 using GrpcUpdatePasswordRequest = Pvs.Auth.Grpc.UpdatePasswordRequest;
+using DtoRefreshTokenRequest = authorization_module.API.Dtos.RefreshTokenRequest;
+using DtoConfirmEmailRequest = authorization_module.API.Dtos.ConfirmEmailRequest;
 
 namespace authorization_module.API.Api.Grpc;
 
@@ -22,17 +24,20 @@ public class AuthService : AuthServiceBase
     private readonly IAuthService _authService;
     private readonly IValidator<UserRegistrationRequest> _userRegistrationValidator;
     private readonly IValidator<UserLoginRequest> _userLoginValidator;
+    private readonly IMapper _mapper;
 
     public AuthService(
         ILogger<AuthService> logger,
         IAuthService authService,
         IValidator<UserRegistrationRequest> userRegistrationValidator,
-        IValidator<UserLoginRequest> userLoginValidator)
+        IValidator<UserLoginRequest> userLoginValidator,
+        IMapper mapper)
     {
         _logger = logger;
         _authService = authService;
         _userRegistrationValidator = userRegistrationValidator;
         _userLoginValidator = userLoginValidator;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -47,7 +52,7 @@ public class AuthService : AuthServiceBase
             _logger.LogInformation("RegisterUser gRPC request for email: {Email}", request.Email);
 
             // Преобразуем gRPC запрос в DTO
-            var registrationDto = AuthMapper.ToRegistrationRequest(request);
+            var registrationDto = _mapper.Map<UserRegistrationRequest>(request);
 
             // Валидация с помощью FluentValidation
             var validationResult = await _userRegistrationValidator.ValidateAsync(registrationDto, context.CancellationToken);
@@ -62,7 +67,7 @@ public class AuthService : AuthServiceBase
             var result = await _authService.RegisterUserAsync(registrationDto);
 
             // Преобразуем DTO ответ в gRPC ответ
-            var response = AuthMapper.ToGrpcResponse(result);
+            var response = _mapper.Map<RegisterUserResponse>(result);
 
             _logger.LogInformation("User registered successfully: {Email}", request.Email);
 
@@ -98,7 +103,7 @@ public class AuthService : AuthServiceBase
             _logger.LogInformation("LoginUser gRPC request for email: {Email}", request.Email);
 
             // Преобразуем gRPC запрос в DTO
-            var loginDto = AuthMapper.ToLoginRequest(request);
+            var loginDto = _mapper.Map<UserLoginRequest>(request);
 
             // Валидация с помощью FluentValidation
             var validationResult = await _userLoginValidator.ValidateAsync(loginDto, context.CancellationToken);
@@ -113,7 +118,7 @@ public class AuthService : AuthServiceBase
             var result = await _authService.LoginUserAsync(loginDto);
 
             // Преобразуем DTO ответ в gRPC ответ
-            var response = AuthMapper.ToTokenResponse(result);
+            var response = _mapper.Map<TokenResponse>(result);
 
             _logger.LogInformation("User logged in successfully: {Email}", request.Email);
 
@@ -156,13 +161,13 @@ public class AuthService : AuthServiceBase
             _logger.LogInformation("RefreshToken gRPC request");
 
             // Преобразуем gRPC запрос в DTO
-            var refreshTokenDto = AuthMapper.ToRefreshTokenRequest(request);
+            var refreshTokenDto = _mapper.Map<DtoRefreshTokenRequest>(request);
 
             // Обновление токена
             var result = await _authService.RefreshToken(refreshTokenDto);
 
             // Преобразуем DTO ответ в gRPC ответ
-            var response = AuthMapper.ToTokenResponse(result);
+            var response = _mapper.Map<TokenResponse>(result);
 
             _logger.LogInformation("Token refreshed successfully");
 
@@ -205,13 +210,13 @@ public class AuthService : AuthServiceBase
             _logger.LogInformation("ConfirmEmail gRPC request for userId: {UserId}", request.UserId);
 
             // Преобразуем gRPC запрос в DTO
-            var confirmEmailDto = AuthMapper.ToConfirmEmailRequest(request);
+            var confirmEmailDto = _mapper.Map<DtoConfirmEmailRequest>(request);
 
             // Подтверждение email
             var result = await _authService.ConfirmEmailAsync(confirmEmailDto);
 
             // Преобразуем DTO ответ в gRPC ответ
-            var response = AuthMapper.ToMessageResponse(result);
+            var response = _mapper.Map<MessageResponse>(result);
 
             _logger.LogInformation("Email confirmed successfully for userId: {UserId}", request.UserId);
 
@@ -260,7 +265,7 @@ public class AuthService : AuthServiceBase
             var result = await _authService.GetUserInfoAsync(userId);
 
             // Преобразуем DTO ответ в gRPC ответ
-            var response = AuthMapper.ToUserInfoResponse(result);
+            var response = _mapper.Map<UserInfoResponse>(result);
 
             _logger.LogInformation("User info retrieved successfully for userId: {UserId}", userId);
 
@@ -316,7 +321,7 @@ public class AuthService : AuthServiceBase
             var result = await _authService.LogoutUserAsync(userId, request.RefreshToken);
 
             // Преобразуем DTO ответ в gRPC ответ
-            var response = AuthMapper.ToMessageResponse(result);
+            var response = _mapper.Map<MessageResponse>(result);
 
             _logger.LogInformation("User logged out successfully for userId: {UserId}", userId);
 
@@ -372,7 +377,7 @@ public class AuthService : AuthServiceBase
             var result = await _authService.UpdateUserNameAsync(userId, request.UserName);
 
             // Преобразуем DTO ответ в gRPC ответ
-            var response = AuthMapper.ToMessageResponse(result);
+            var response = _mapper.Map<MessageResponse>(result);
 
             _logger.LogInformation("Username updated successfully for userId: {UserId}", userId);
 
@@ -434,7 +439,7 @@ public class AuthService : AuthServiceBase
             var result = await _authService.UpdateUserPasswordAsync(userId, request.CurrentPassword, request.NewPassword);
 
             // Преобразуем DTO ответ в gRPC ответ
-            var response = AuthMapper.ToMessageResponse(result);
+            var response = _mapper.Map<MessageResponse>(result);
 
             _logger.LogInformation("Password updated successfully for userId: {UserId}", userId);
 
