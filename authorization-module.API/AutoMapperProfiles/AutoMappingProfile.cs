@@ -6,14 +6,14 @@ using DtoRefreshTokenRequest = authorization_module.API.Dtos.RefreshTokenRequest
 using GrpcConfirmEmailRequest = Pvs.Auth.Grpc.ConfirmEmailRequest;
 using GrpcRefreshTokenRequest = Pvs.Auth.Grpc.RefreshTokenRequest;
 
-namespace authorization_module.API.Mappers.AutoMapperProfiles;
+namespace authorization_module.API.Mappers;
 
 /// <summary>
 /// AutoMapper профиль для маппинга авторизации
 /// </summary>
-public class AuthMappingProfile : Profile
+public class AutoMappingProfile : Profile
 {
-    public AuthMappingProfile()
+    public AutoMappingProfile()
     {
         // RegisterUserRequest (gRPC) -> UserRegistrationRequest (DTO)
         CreateMap<RegisterUserRequest, UserRegistrationRequest>();

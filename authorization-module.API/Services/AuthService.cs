@@ -69,41 +69,49 @@ public class AuthService(UserManager<ApplicationUser> userManager,
 
     public async Task<TokenDto> LoginUserAsync(UserLoginRequest model)
     {
-        var user = await _userManager.FindByEmailAsync(model.Email)
+        try
+        {
+            var user = await _userManager.FindByEmailAsync(model.Email)
             ?? throw new ResponseException("User not found");
 
-        var result = await _signInManager.PasswordSignInAsync(user.UserName!, model.Password, false, lockoutOnFailure: false);
+            var result = await _signInManager.PasswordSignInAsync(user.UserName!, model.Password, false, lockoutOnFailure: false);
 
-        if (!result.Succeeded)
-        {
-            throw new ResponseException("Invalid login attempt");
+            if (!result.Succeeded)
+            {
+                throw new ResponseException("Invalid login attempt");
+            }
+
+            //if (!user.EmailConfirmed)
+            //{
+            //    throw new ResponseException("Email not confirmed");
+            //}
+
+            var accessToken = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
+            var refreshToken = _tokenService.GenerateRefreshToken();
+
+            // Add the new refresh token without revoking existing ones
+            var refreshTokenEntity = new RefreshToken
+            {
+                Token = refreshToken,
+                UserId = user.Id,
+                ExpiryDate = DateTime.UtcNow.AddDays(7),
+                IsRevoked = false
+            };
+
+            _dbContext.RefreshTokens.Add(refreshTokenEntity);
+            await _dbContext.SaveChangesAsync();
+
+            return new TokenDto
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
+            };
         }
-
-        //if (!user.EmailConfirmed)
-        //{
-        //    throw new ResponseException("Email not confirmed");
-        //}
-
-        var accessToken = _tokenService.GenerateJwtToken(user.Id, user.UserName!);
-        var refreshToken = _tokenService.GenerateRefreshToken();
-
-        // Add the new refresh token without revoking existing ones
-        var refreshTokenEntity = new RefreshToken
+        catch (Exception ex)
         {
-            Token = refreshToken,
-            UserId = user.Id,
-            ExpiryDate = DateTime.UtcNow.AddDays(7),
-            IsRevoked = false
-        };
-
-        _dbContext.RefreshTokens.Add(refreshTokenEntity);
-        await _dbContext.SaveChangesAsync();
-
-        return new TokenDto
-        {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken
-        };
+            throw;
+        }
+        
     }
 
     public async Task<TokenDto> RefreshToken(RefreshTokenRequest request)

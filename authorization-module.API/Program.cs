@@ -3,19 +3,18 @@ using authorization_module.API.Data.Entities;
 using authorization_module.API.Dtos;
 using authorization_module.API.Exceptions;
 using authorization_module.API.Interfaces;
-using authorization_module.API.Mappers.AutoMapperProfiles;
+using authorization_module.API.Mappers;
 using authorization_module.API.Services;
 using authorization_module.API.Validations;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
-
-using authorization_module;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,9 +48,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
 
-// Регистрация AutoMapper
-var assembly = typeof(AuthMappingProfile).Assembly;
-builder.Services.AddAutoMapper(assembly);
+builder.Services.AddAutoMapper(cfg => { }, typeof(AutoMappingProfile));
 //validation
 builder.Services.AddScoped<IValidator<UserRegistrationRequest>, UserRegistrationValidator>();
 builder.Services.AddScoped<IValidator<UserLoginRequest>, UserLoginValidator>();
