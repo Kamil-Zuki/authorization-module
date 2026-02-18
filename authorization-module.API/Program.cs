@@ -89,12 +89,12 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // Настройка Kestrel для поддержки HTTP/2 без TLS (для локальной разработки)
-// Используем такой же подход, как в рабочем проекте knowledge-service
+// В контейнере слушаем на всех интерфейсах (0.0.0.0), иначе только loopback.
 builder.WebHost.ConfigureKestrel(options =>
 {
-    // Используем IPAddress.Loopback (127.0.0.1) вместо ListenLocalhost
-    // Протоколы берутся из appsettings.json (Kestrel:EndpointDefaults:Protocols)
-    options.Listen(System.Net.IPAddress.Loopback, 5027);
+    var inContainer = string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase);
+    var listenAddress = inContainer ? System.Net.IPAddress.Any : System.Net.IPAddress.Loopback;
+    options.Listen(listenAddress, 5027);
 });
 
 builder.Services.AddGrpc(options =>
