@@ -8,6 +8,7 @@ using authorization_module.API.Services;
 using authorization_module.API.Validations;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -89,12 +90,13 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // Настройка Kestrel для поддержки HTTP/2 без TLS (для локальной разработки)
+// Без явного Protocols = Http2 gRPC-клиент получает HttpRequestException (RequestVersionExact HTTP/2).
 // В контейнере слушаем на всех интерфейсах (0.0.0.0), иначе только loopback.
 builder.WebHost.ConfigureKestrel(options =>
 {
     var inContainer = string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase);
     var listenAddress = inContainer ? System.Net.IPAddress.Any : System.Net.IPAddress.Loopback;
-    options.Listen(listenAddress, 5027);
+    options.Listen(listenAddress, 5027, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
 });
 
 builder.Services.AddGrpc(options =>
