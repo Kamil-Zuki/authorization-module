@@ -19,6 +19,9 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var corsOrigins = GetCorsOrigins(builder.Configuration);
+ValidateAuthorizationConfiguration(builder.Configuration, builder.Environment, corsOrigins);
+
 // В режиме RELEASE используем UseUrls
 // В режиме разработки используем ListenLocalhost из ConfigureKestrel
 #if RELEASE
@@ -37,9 +40,10 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 
 builder.Services.AddCors(options => options.AddPolicy("cors", policy =>
 {
-    policy.AllowAnyHeader()
+    policy.WithOrigins(corsOrigins)
+          .AllowAnyHeader()
           .AllowAnyMethod()
-          .AllowAnyOrigin();
+          .AllowCredentials();
 }));
 
 
@@ -96,14 +100,14 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     var inContainer = string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase);
     var listenAddress = inContainer ? System.Net.IPAddress.Any : System.Net.IPAddress.Loopback;
-    options.Listen(listenAddress, 5027, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
+    options.Listen(listenAddress, 5027, listenOptions => listenOptions.Protocols = HttpProtocols.Http1AndHttp2);
 });
 
 builder.Services.AddGrpc(options =>
 {
     options.MaxSendMessageSize = 1000 * 1024 * 1024; // 1 GB
     options.MaxReceiveMessageSize = 1000 * 1024 * 1024; // 1 GB
-    options.EnableDetailedErrors = true;
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 });
 
 var app = builder.Build();
@@ -118,28 +122,154 @@ app.UseAuthorization();
 
 //app.UseHttpsRedirection();
 
-
-
-app.UseSwagger(c =>
+if (app.Environment.IsDevelopment())
 {
-    c.RouteTemplate = "authorization-module/swagger/{documentname}/swagger.json";
-});
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/authorization-module/swagger/v1/swagger.json", "Authorization API");
-    c.RoutePrefix = "authorization-module/swagger";
-});
-
-app.Use(async (context, next) =>
-{
-    var authHeader = context.Request.Headers["Authorization"].ToString();
-    app.Logger.LogInformation("Raw Authorization Header: '{Header}'", authHeader);
-    await next(context);
-});
+    app.UseSwagger(c =>
+    {
+        c.RouteTemplate = "authorization-module/swagger/{documentname}/swagger.json";
+    });
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/authorization-module/swagger/v1/swagger.json", "Authorization API");
+        c.RoutePrefix = "authorization-module/swagger";
+    });
+}
 
 // Map gRPC services
 app.MapGrpcService<authorization_module.API.Api.Grpc.AuthService>();
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
 app.MapControllers();
 
 app.Run();
+
+string[] GetCorsOrigins(IConfiguration configuration)
+{
+    var configuredOrigins = configuration["Cors:AllowedOrigins"];
+    if (!string.IsNullOrWhiteSpace(configuredOrigins))
+    {
+        return SplitOrigins(configuredOrigins);
+    }
+
+    var legacyOrigins = configuration.GetSection("Cors:Urls").Get<string[]>();
+    if (legacyOrigins is { Length: > 0 })
+    {
+        return legacyOrigins
+            .Select(origin => origin.Trim())
+            .Where(origin => !string.IsNullOrWhiteSpace(origin))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    return ["http://localhost:3000", "http://localhost:5000"];
+}
+
+void ValidateAuthorizationConfiguration(
+    IConfiguration configuration,
+    IWebHostEnvironment environment,
+    string[] allowedOrigins)
+{
+    if (environment.IsDevelopment())
+    {
+        return;
+    }
+
+    var errors = new List<string>();
+
+    ValidateJwtConfiguration(configuration, errors);
+    ValidateConfirmationLink(configuration, errors);
+    ValidateEmailConfiguration(configuration, errors);
+    ValidateCorsConfiguration(allowedOrigins, errors);
+
+    if (errors.Count > 0)
+    {
+        throw new InvalidOperationException(
+            "authorization-module is missing required production configuration:" +
+            $"{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", errors)}");
+    }
+}
+
+void ValidateJwtConfiguration(IConfiguration configuration, List<string> errors)
+{
+    var jwtSecret = configuration["Jwt:Secret"];
+    if (string.IsNullOrWhiteSpace(jwtSecret) ||
+        jwtSecret.Length < 32 ||
+        LooksLikePlaceholder(jwtSecret))
+    {
+        errors.Add("Jwt:Secret must be set to a non-placeholder value with at least 32 characters.");
+    }
+
+    if (string.IsNullOrWhiteSpace(configuration["Jwt:Issuer"]) || LooksLikePlaceholder(configuration["Jwt:Issuer"]!))
+    {
+        errors.Add("Jwt:Issuer must be configured.");
+    }
+
+    if (string.IsNullOrWhiteSpace(configuration["Jwt:Audience"]) || LooksLikePlaceholder(configuration["Jwt:Audience"]!))
+    {
+        errors.Add("Jwt:Audience must be configured.");
+    }
+}
+
+void ValidateConfirmationLink(IConfiguration configuration, List<string> errors)
+{
+    var confirmationLink = configuration["ConfirmationLink"];
+    if (string.IsNullOrWhiteSpace(confirmationLink) ||
+        !Uri.TryCreate(confirmationLink, UriKind.Absolute, out var parsedUri) ||
+        (parsedUri.Scheme != Uri.UriSchemeHttp && parsedUri.Scheme != Uri.UriSchemeHttps) ||
+        LooksLikePlaceholder(confirmationLink))
+    {
+        errors.Add("ConfirmationLink must be an absolute public URL that points to the email confirmation endpoint.");
+    }
+}
+
+void ValidateEmailConfiguration(IConfiguration configuration, List<string> errors)
+{
+    var requiredEmailKeys = new[]
+    {
+        "Email:Host",
+        "Email:UserName",
+        "Email:Password",
+        "Email:Address",
+        "Email:DisplayName"
+    };
+
+    foreach (var key in requiredEmailKeys)
+    {
+        var value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value) || LooksLikePlaceholder(value))
+        {
+            errors.Add($"{key} must be configured with a real value.");
+        }
+    }
+
+    if (!int.TryParse(configuration["Email:Port"], out var port) || port <= 0)
+    {
+        errors.Add("Email:Port must be a positive integer.");
+    }
+}
+
+void ValidateCorsConfiguration(string[] allowedOrigins, List<string> errors)
+{
+    if (allowedOrigins.Length == 0)
+    {
+        errors.Add("Cors:AllowedOrigins must contain at least one origin.");
+        return;
+    }
+
+    if (allowedOrigins.Any(origin => origin == "*"))
+    {
+        errors.Add("Cors:AllowedOrigins cannot contain '*'.");
+    }
+}
+
+string[] SplitOrigins(string configuredOrigins) =>
+    configuredOrigins
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+bool LooksLikePlaceholder(string value) =>
+    value.Contains("change-me", StringComparison.OrdinalIgnoreCase) ||
+    value.Contains("example", StringComparison.OrdinalIgnoreCase) ||
+    value.Contains("yourdomain", StringComparison.OrdinalIgnoreCase) ||
+    value.Contains("yoursecretkeyhere", StringComparison.OrdinalIgnoreCase);
