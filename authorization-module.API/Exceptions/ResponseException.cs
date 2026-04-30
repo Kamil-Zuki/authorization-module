@@ -7,11 +7,13 @@ public class ResponseException : Exception
     public List<ErrorResponseMessage> Errors { get; }
 
     public ResponseException(IEnumerable<ErrorResponseMessage> errors)
+        : base(errors.FirstOrDefault()?.ErrorMessage ?? "Request failed")
     {
         Errors = errors.ToList();
     }
 
     public ResponseException(string message)
+        : base(message)
     {
         Errors = new List<ErrorResponseMessage>
         {
