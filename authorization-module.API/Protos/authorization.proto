@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package pvs.auth.v1;
+
+
+option csharp_namespace = "Pvs.Auth.Grpc";
+
+// ============================================================================
+// Service Definition
+// ============================================================================
+
+service AuthService {
+  // Регистрация нового пользователя
+  rpc RegisterUser (RegisterUserRequest) returns (RegisterUserResponse);
+
+  // Вход пользователя
+  rpc LoginUser (LoginUserRequest) returns (TokenResponse);
+
+  // Обновление токена
+  rpc RefreshToken (RefreshTokenRequest) returns (TokenResponse);
+
+  // Подтверждение email
+  rpc ConfirmEmail (ConfirmEmailRequest) returns (MessageResponse);
+
+  // Повторная отправка письма подтверждения
+  rpc ResendConfirmationEmail (ResendConfirmationEmailRequest) returns (MessageResponse);
+
+  // Получение информации о текущем пользователе
+  rpc GetUserInfo (GetUserInfoRequest) returns (UserInfoResponse);
+
+  // Поиск пользователя по email для внутренних сценариев совместного доступа
+  rpc FindUserByEmail (FindUserByEmailRequest) returns (UserInfoResponse);
+
+  // Выход пользователя
+  rpc LogoutUser (LogoutUserRequest) returns (MessageResponse);
+
+  // Обновление имени пользователя
+  rpc UpdateUsername (UpdateUsernameRequest) returns (MessageResponse);
+
+  // Обновление пароля пользователя
+  rpc UpdatePassword (UpdatePasswordRequest) returns (MessageResponse);
+
+  // Обновление URL аватара профиля
+  rpc UpdateAvatarUrl (UpdateAvatarUrlRequest) returns (MessageResponse);
+  // Получение списка всех пользователей (только для Admin)
+  rpc GetUsersList (GetUsersListRequest) returns (GetUsersListResponse);
+
+  // Бан/разбан пользователя (только для Admin)
+  rpc AdminSetUserLockout (AdminSetUserLockoutRequest) returns (MessageResponse);
+}
+
+// ============================================================================
+// Messages
+// ============================================================================
+
+// Регистрация пользователя
+message RegisterUserRequest {
+  string email = 1;
+  string password = 2;
+  string confirm_password = 3;
+}
+
+message RegisterUserResponse {
+  string message = 1;
+}
+
+// Вход пользователя
+message LoginUserRequest {
+  string email = 1;
+  string password = 2;
+}
+
+// Токены
+message TokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+// Обновление токена
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// Подтверждение email
+message ConfirmEmailRequest {
+  string user_id = 1; // UUID
+  string token = 2;
+}
+
+// Повторная отправка письма подтверждения
+message ResendConfirmationEmailRequest {
+  string email = 1;
+}
+
+// Информация о пользователе
+message GetUserInfoRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+}
+
+message FindUserByEmailRequest {
+  string email = 1;
+}
+
+message UserInfoResponse {
+  string id = 1; // UUID
+  string user_name = 2;
+  string email = 3;
+  bool email_confirmed = 4;
+  string avatar_url = 5;
+}
+
+// Выход пользователя
+message LogoutUserRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+  string refresh_token = 2;
+}
+
+// Обновление имени пользователя
+message UpdateUsernameRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+  string user_name = 2;
+}
+
+// Обновление пароля пользователя
+message UpdatePasswordRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+  string current_password = 2;
+  string new_password = 3;
+}
+
+// Обновление URL аватара (пустая строка — сбросить)
+message UpdateAvatarUrlRequest {
+  string user_id = 1; // UUID (из метаданных gRPC)
+  string avatar_url = 2;
+}
+
+// Общий ответ с сообщением
+message MessageResponse {
+  string message = 1;
+}
+
+// Запрос списка пользователей
+message GetUsersListRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3;          // фильтр по email/userName
+}
+
+message UserListDto {
+  string id = 1;
+  string user_name = 2;
+  string email = 3;
+  string registration_date = 4;
+  bool is_locked_out = 5;
+}
+
+message GetUsersListResponse {
+  repeated UserListDto users = 1;
+  int32 total_count = 2;
+}
+
+// Бан/разбан пользователя
+message AdminSetUserLockoutRequest {
+  string user_id = 1;         // UUID
+  bool lock = 2;              // true = бан, false = разбан
+}
